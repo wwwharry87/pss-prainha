@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const Candidato = require('../models/Candidato');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { handleUploadCandidatos } = require('../middleware/upload');
 
 router.get('/check', async (req, res) => {
