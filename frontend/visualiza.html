@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MINHAS INSCRIÇÕES - PSS Prainha</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+  <!-- pdfMake para gerar o PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/vfs_fonts.js"></script>
+  <style>
+    body { background-color: #f8f9fa; }
+    .card-inscricao { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .text-uppercase { text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="container my-5">
+    <!-- Botão de Logout com ícone e texto "Sair" -->
+    <div class="d-flex justify-content-end mb-3">
+      <a href="index.html" class="btn btn-danger">
+        <i class="bi bi-box-arrow-right"></i> Sair
+      </a>
+    </div>
+    
+    <h1 class="text-center text-primary mb-4">MINHAS INSCRIÇÕES</h1>
+    
+    <!-- Dados do candidato -->
+    <div id="dadosCandidato" class="mb-4"></div>
+    
+    <!-- Spinner de carregamento -->
+    <div id="loading" class="d-none text-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+      <p>Carregando inscrições, por favor aguarde...</p>
+    </div>
+    
+    <!-- Lista de inscrições -->
+    <div id="inscricoes" class="row g-3"></div>
+  </div>
+  
+  <script>
+    // Variáveis globais para armazenar dados do candidato e inscrições
+    let globalCandidato = null;
+    let globalInscricoes = [];
+    let brasaoBase64 = null;  // Para armazenar o brasão em Base64
+
+    // Função para carregar a imagem do brasão e converter para Base64
+    async function carregarImagemParaBase64(url) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error("Erro ao carregar imagem:", error);
+        return "";
+      }
+    }
+
+    // Carrega a imagem do brasão (certifique-se de que 'brasao.jpg' esteja na pasta frontend)
+    carregarImagemParaBase64('brasao.jpg')
+      .then(base64 => { brasaoBase64 = base64; })
+      .catch(err => { console.error("Erro ao converter imagem:", err); brasaoBase64 = ""; });
+
+    // Função para formatar CPF
+    function formatarCPF(cpf) {
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    }
+
+    // Obtém o CPF (ou token) da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const cpfParam = urlParams.get('cpf');
+
+    // Carrega os dados do candidato e inscrições
+    async function carregarDados() {
+      document.getElementById('loading').classList.remove('d-none');
+      let url = "";
+      if (token) {
+        url = `/api/visualiza/token/${token}`;
+      } else if (cpfParam) {
+        url = `/api/visualiza/${cpfParam}`;
+      } else {
+        alert("Nenhum token ou CPF fornecido.");
+        document.getElementById('loading').classList.add('d-none');
+        return;
+      }
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!response.ok) {
+          document.getElementById('inscricoes').innerHTML = `<div class="alert alert-danger">${data.message || data.error}</div>`;
+          document.getElementById('loading').classList.add('d-none');
+          return;
+        }
+        globalCandidato = data.candidato;
+        globalInscricoes = data.inscricoes || [];
+        // Ordena as inscrições pela data de criação (primeira inscrição primeiro)
+        globalInscricoes.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        exibirDadosCandidato(globalCandidato);
+        exibirInscricoes(globalInscricoes);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        document.getElementById('inscricoes').innerHTML = `<div class="alert alert-danger">ERRO AO CARREGAR OS DADOS.</div>`;
+      } finally {
+        document.getElementById('loading').classList.add('d-none');
+      }
+    }
+
+    // Exibe os dados do candidato com botões de nova inscrição e imprimir
+    function exibirDadosCandidato(candidato) {
+      const container = document.getElementById('dadosCandidato');
+      container.innerHTML = `
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title text-uppercase">${candidato.nome}</h5>
+            <p class="card-text"><strong>CPF:</strong> ${formatarCPF(candidato.cpf)}</p>
+            <p class="card-text"><strong>E-MAIL:</strong> ${candidato.email}</p>
+            ${candidato.pcd ? `<p class="card-text"><strong>LAUDO:</strong> ${candidato.laudo ? candidato.laudo : 'NÃO ANEXADO'}</p>` : ''}
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-primary btn-sm" onclick="window.location.href='/inscricao.html?${token ? 'token' : 'cpf'}=${encodeURIComponent(token || candidato.cpf)}'">NOVA INSCRIÇÃO</button>
+              <button class="btn btn-secondary btn-sm" onclick="imprimirTodas()">IMPRIMIR TODAS</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Exibe as inscrições em cartões
+    function exibirInscricoes(inscricoes) {
+      const container = document.getElementById('inscricoes');
+      container.innerHTML = '';
+      if (inscricoes.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">NENHUMA INSCRIÇÃO ENCONTRADA.</div>`;
+        return;
+      }
+      globalInscricoes.forEach((insc, index) => {
+        const cargoCompleto = insc.Cargo 
+          ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` 
+          : 'CARGO NÃO INFORMADO';
+        let dataInscricao = '';
+        if (insc.createdAt) {
+          const dt = new Date(insc.createdAt);
+          dataInscricao = dt.toLocaleString('pt-BR');
+        }
+        
+        // Prepara a lista de anexos com base nos documentos enviados
+        let anexos = [];
+        if (insc.doc_identidade_path) anexos.push("RG ou CNH");
+        if (insc.doc_escolaridade_path) anexos.push("Comprovante de Escolaridade");
+        if (insc.doc_diploma_path) anexos.push("Diploma de Graduação");
+        if (insc.doc_especifico_path) anexos.push("Documento Adicional");
+        if (insc.doc_especializacao_path) anexos.push("Diploma de Especialização");
+        if (insc.doc_mestrado_path) anexos.push("Diploma de Mestrado");
+        if (insc.doc_doutorado_path) anexos.push("Diploma de Doutorado");
+        if (insc.doc_plano_aula_path) anexos.push("Plano de Aula");
+        
+        let anexosHTML = '';
+        if (anexos.length > 0) {
+          anexosHTML = `<p><strong>Anexo(s):</strong></p><ul>`;
+          anexos.forEach(item => {
+            anexosHTML += `<li>${item}</li>`;
+          });
+          anexosHTML += `</ul>`;
+        }
+        
+        const div = document.createElement('div');
+        div.className = 'col-md-6';
+        div.innerHTML = `
+          <div class="card card-inscricao shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title text-center" style="color: black;">${index + 1}ª INSCRIÇÃO</h5>
+              <p class="card-text text-left" style="color: blue;"><strong>${cargoCompleto}</strong></p>
+              <p class="card-text"><strong>ZONA:</strong> ${insc.zona}</p>
+              <p class="card-text"><strong>TEMPO DE SERVIÇO:</strong> ${insc.tempo_servico} ANOS</p>
+              <p class="card-text"><strong>DATA DA INSCRIÇÃO:</strong> ${dataInscricao}</p>
+              ${insc.plan_aula ? `<p class="card-text"><strong>PLANO DE AULA:</strong> ${insc.plan_aula}</p>` : ''}
+              ${anexosHTML}
+              <div class="d-flex gap-2">
+                <button class="btn btn-danger btn-sm" onclick="excluirInscricao(${insc.id})">EXCLUIR</button>
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Função para excluir inscrição individual
+    async function excluirInscricao(inscricaoId) {
+      if (!confirm('Tem certeza que deseja excluir esta inscrição?')) return;
+      try {
+        const response = await fetch(`/api/inscricoes/${inscricaoId}`, { method: 'DELETE' });
+        const result = await response.json();
+        alert(result.message || 'Inscrição excluída com sucesso.');
+        carregarDados();
+      } catch (error) {
+        console.error("Erro ao excluir inscrição:", error);
+        alert('Erro ao excluir inscrição.');
+      }
+    }
+
+    // Função para gerar PDF de todas as inscrições, incluindo a lista de anexos
+    function imprimirTodas() {
+      if (!globalInscricoes || globalInscricoes.length === 0) {
+        alert('Nenhuma inscrição para imprimir.');
+        return;
+      }
+      if (!brasaoBase64) {
+        alert('Imagem do brasão não carregada. Tente novamente.');
+        return;
+      }
+      
+      const content = [
+        { image: brasaoBase64, width: 80, alignment: 'center' },
+        { text: 'MUNICÍPIO DE PRAINHA - PA', style: 'title', alignment: 'center' },
+        { text: 'PROCESSO SELETIVO SIMPLIFICADO - 001/2025', style: 'title', alignment: 'center' },
+        { text: '\nCOMPROVANTE DE INSCRIÇÕES\n', style: 'header', alignment: 'center' },
+        { text: `Candidato: ${globalCandidato.nome}  |  CPF: ${formatarCPF(globalCandidato.cpf)}`, style: 'subheader', alignment: 'center' },
+        { text: '\n', style: 'small' }
+      ];
+      
+      globalInscricoes.forEach((insc, index) => {
+        const cargoCompleto = insc.Cargo 
+          ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` 
+          : 'CARGO NÃO INFORMADO';
+        let dataInscricao = '';
+        if (insc.createdAt) {
+          const dt = new Date(insc.createdAt);
+          dataInscricao = dt.toLocaleString('pt-BR');
+        }
+        
+        // Lista de anexos
+        let anexos = [];
+        if (insc.doc_identidade_path) anexos.push("RG ou CNH");
+        if (insc.doc_escolaridade_path) anexos.push("Comprovante de Escolaridade");
+        if (insc.doc_diploma_path) anexos.push("Diploma de Graduação");
+        if (insc.doc_especifico_path) anexos.push("Documento Adicional");
+        if (insc.doc_especializacao_path) anexos.push("Diploma de Especialização");
+        if (insc.doc_mestrado_path) anexos.push("Diploma de Mestrado");
+        if (insc.doc_doutorado_path) anexos.push("Diploma de Doutorado");
+        if (insc.doc_plano_aula_path) anexos.push("Plano de Aula");
+        
+        content.push(
+          { text: `${index + 1}ª INSCRIÇÃO`, style: 'inscHeader', alignment: 'center', color: 'black' },
+          {
+            style: 'table',
+            table: {
+              widths: ['30%', '70%'],
+              body: [
+                [
+                  { text: 'Data da Inscrição:', style: 'tableHeader', alignment: 'left' },
+                  { text: dataInscricao || '---', style: 'tableData', alignment: 'left' }
+                ],
+                [
+                  { text: 'Cargo:', style: 'tableHeader', alignment: 'left' },
+                  { text: cargoCompleto, style: 'tableData', alignment: 'left', color: 'blue' }
+                ],
+                [
+                  { text: 'Zona:', style: 'tableHeader', alignment: 'left' },
+                  { text: insc.zona, style: 'tableData', alignment: 'left' }
+                ],
+                [
+                  { text: 'Tempo de Serviço:', style: 'tableHeader', alignment: 'left' },
+                  { text: `${insc.tempo_servico} ANOS`, style: 'tableData', alignment: 'left' }
+                ]
+              ]
+            },
+            layout: 'lightHorizontalLines'
+          }
+        );
+        
+        // Se houver anexos, adiciona a lista
+        if (anexos.length > 0) {
+          content.push(
+            { text: 'ANEXO(S):', style: 'tableHeader', margin: [0, 5, 0, 2] },
+            { ul: anexos, style: 'tableData' }
+          );
+        }
+        
+        content.push({ text: '\n' });
+      });
+      
+      content.push({
+        text: 'Documento gerado em ' + new Date().toLocaleString('pt-BR'),
+        style: 'small',
+        alignment: 'right'
+      });
+      
+      const docDefinition = {
+        content,
+        styles: {
+          title: { fontSize: 14, bold: true },
+          header: { fontSize: 16, bold: true },
+          subheader: { fontSize: 12, margin: [0, 2, 0, 2] },
+          inscHeader: { fontSize: 12, bold: true, margin: [0, 5, 0, 2] },
+          tableHeader: { bold: true, fillColor: '#eeeeee' },
+          tableData: { fontSize: 10 },
+          small: { fontSize: 8, italics: true }
+        }
+      };
+      
+      pdfMake.createPdf(docDefinition).open();
+    }
+    
+    // Carrega os dados ao carregar a página
+    carregarDados();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

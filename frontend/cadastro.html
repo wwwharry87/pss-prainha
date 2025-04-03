@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro - PSS Prainha</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; }
+    .card { border-radius: 10px; }
+    .card-title { color: #1a73e8; }
+    input, select, textarea { text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="container my-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title text-center mb-4">Cadastro de Candidato</h1>
+        <form id="cadastroForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="cpf" class="form-label">CPF</label>
+              <input type="text" class="form-control" id="cpf" name="cpf" required placeholder="DIGITE SOMENTE NÚMEROS" pattern="\d{11}">
+            </div>
+            <div class="col-md-6">
+              <label for="rg" class="form-label">RG</label>
+              <input type="text" class="form-control" id="rg" name="rg" required>
+            </div>
+            <div class="col-12">
+              <label for="nome" class="form-label">NOME COMPLETO</label>
+              <input type="text" class="form-control" id="nome" name="nome" required>
+            </div>
+            <div class="col-md-6">
+              <label for="data_nascimento" class="form-label">DATA DE NASCIMENTO</label>
+              <!-- Input de texto com máscara de DD/MM/AAAA -->
+              <input type="text" class="form-control" id="data_nascimento" name="data_nascimento" required
+                     placeholder="DD/MM/AAAA" pattern="^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$" maxlength="10">
+            </div>
+            <div class="col-md-6">
+              <label for="sexo" class="form-label">SEXO</label>
+              <select class="form-select" id="sexo" name="sexo" required>
+                <option value="">SELECIONE</option>
+                <option value="MASCULINO">MASCULINO</option>
+                <option value="FEMININO">FEMININO</option>
+                <option value="OUTRO">OUTRO</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="email" class="form-label">E-MAIL</label>
+              <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="col-md-6">
+              <label for="celular" class="form-label">CELULAR</label>
+              <input type="tel" class="form-control" id="celular" name="celular" required>
+            </div>
+            <div class="col-md-4">
+              <label for="cep" class="form-label">CEP</label>
+              <!-- Campo CEP ajustado para aceitar somente 8 dígitos -->
+              <input type="text" class="form-control" id="cep" name="cep" required maxlength="8" pattern="\d{8}" placeholder="CEP (8 dígitos)">
+            </div>
+            <div class="col-md-4">
+              <label for="estado" class="form-label">ESTADO</label>
+              <input type="text" class="form-control" id="estado" name="estado" required>
+            </div>
+            <div class="col-md-4">
+              <label for="municipio" class="form-label">MUNICÍPIO</label>
+              <input type="text" class="form-control" id="municipio" name="municipio" required>
+            </div>
+            <div class="col-md-6">
+              <label for="logradouro" class="form-label">LOGRADOURO</label>
+              <input type="text" class="form-control" id="logradouro" name="logradouro" required>
+            </div>
+            <div class="col-md-4">
+              <label for="bairro" class="form-label">BAIRRO</label>
+              <input type="text" class="form-control" id="bairro" name="bairro" required>
+            </div>
+            <div class="col-md-2">
+              <label for="numero" class="form-label">NÚMERO</label>
+              <input type="text" class="form-control" id="numero" name="numero" required>
+            </div>
+            <div class="col-12">
+              <label for="complemento" class="form-label">COMPLEMENTO <span class="text-muted">(OPCIONAL)</span></label>
+              <input type="text" class="form-control" id="complemento" name="complemento">
+            </div>
+            <div class="col-md-6">
+              <label for="pcd" class="form-label">PESSOA COM DEFICIÊNCIA?</label>
+              <select class="form-select" id="pcd" name="pcd" required>
+                <option value="false">NÃO</option>
+                <option value="true">SIM</option>
+              </select>
+            </div>
+          </div>
+          <!-- Campo para upload do laudo -->
+          <div class="mt-3" id="laudoDiv" style="display: none;">
+            <label for="laudo" class="form-label">ANEXAR LAUDO (PDF OU IMAGEM - ATÉ 2MB)</label>
+            <input type="file" class="form-control" id="laudo" name="laudo" accept=".pdf,image/*">
+          </div>
+          <div class="mt-3">
+            <label for="senha" class="form-label">SENHA</label>
+            <input type="password" class="form-control" id="senha" name="senha" required>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary w-100">Cadastrar</button>
+          </div>
+          <div id="mensagem" class="mt-3"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inclusão do jQuery e Inputmask para máscaras -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
+  <script>
+    $(document).ready(function(){
+      $("#data_nascimento").inputmask("99/99/9999");
+      $("#cep").inputmask("99999999");
+    });
+  </script>
+
+  <script>
+    // Exibe/oculta o campo de upload do laudo
+    document.getElementById('pcd').addEventListener('change', function() {
+      const laudoDiv = document.getElementById('laudoDiv');
+      if (this.value === "true") {
+        laudoDiv.style.display = "block";
+      } else {
+        laudoDiv.style.display = "none";
+        document.getElementById('laudo').value = "";
+      }
+    });
+
+    // Verifica o tamanho do arquivo (2MB máximo)
+    document.getElementById('laudo').addEventListener('change', function() {
+      const file = this.files[0];
+      if (file && file.size > 2 * 1024 * 1024) {
+        alert('O arquivo excede o limite de 2MB. Por favor, compacte o arquivo.');
+        this.value = "";
+      }
+    });
+
+    // Formata CPF enquanto o usuário digita
+    function formatarCPF(cpf) {
+      cpf = cpf.replace(/\D/g, '');
+      if (cpf.length > 11) cpf = cpf.slice(0, 11);
+      return cpf
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    document.getElementById('cpf').addEventListener('input', function() {
+      this.value = formatarCPF(this.value);
+    });
+
+    // Se o CPF vier via query string, preenche e bloqueia o campo
+    const urlParams = new URLSearchParams(window.location.search);
+    const cpfQuery = urlParams.get('cpf');
+    if (cpfQuery) {
+      document.getElementById('cpf').value = formatarCPF(cpfQuery);
+      document.getElementById('cpf').readOnly = true;
+    }
+
+    // Função para converter data do formato DD/MM/YYYY para Date
+    function parseDate(dateStr) {
+      const parts = dateStr.split('/');
+      return new Date(parts[2], parts[1] - 1, parts[0]);
+    }
+
+    // Calcula a idade com base na data de nascimento (formato DD/MM/YYYY)
+    function calcularIdade(dataNascimentoStr) {
+      const nascimento = parseDate(dataNascimentoStr);
+      const hoje = new Date();
+      let idade = hoje.getFullYear() - nascimento.getFullYear();
+      const mes = hoje.getMonth() - nascimento.getMonth();
+      if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+        idade--;
+      }
+      return idade;
+    }
+
+    // Validação da data de nascimento ao sair do campo
+    document.getElementById('data_nascimento').addEventListener('blur', function() {
+      const valor = this.value.trim();
+      const regex = /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+      if (!regex.test(valor)) {
+        alert("Por favor, informe a data no formato DD/MM/AAAA.");
+        this.focus();
+        return;
+      }
+      const idade = calcularIdade(valor);
+      if (idade < 18 || idade > 100) {
+        alert("A idade deve ser entre 18 e 100 anos. Sua idade calculada: " + idade);
+        this.focus();
+      }
+    });
+
+    // Busca dados de endereço via CEP e trata Logradouro e Bairro
+    document.getElementById('cep').addEventListener('blur', function() {
+      const cep = this.value.replace(/\D/g, '');
+      if (cep.length !== 8) return;
+      fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then(response => response.json())
+        .then(data => {
+          if (!data.erro) {
+            document.getElementById('estado').value = data.uf;
+            document.getElementById('municipio').value = data.localidade;
+            // Para logradouro e bairro, só bloqueia se o valor for retornado
+            if(data.logradouro) {
+              document.getElementById('logradouro').value = data.logradouro;
+              document.getElementById('logradouro').readOnly = true;
+            } else {
+              document.getElementById('logradouro').readOnly = false;
+            }
+            if(data.bairro) {
+              document.getElementById('bairro').value = data.bairro;
+              document.getElementById('bairro').readOnly = true;
+            } else {
+              document.getElementById('bairro').readOnly = false;
+            }
+            // Estado e município sempre são preenchidos e bloqueados
+            document.getElementById('estado').readOnly = true;
+            document.getElementById('municipio').readOnly = true;
+          } else {
+            // Caso CEP não seja encontrado, os campos ficam editáveis
+            document.getElementById('estado').readOnly = false;
+            document.getElementById('municipio').readOnly = false;
+            document.getElementById('bairro').readOnly = false;
+            document.getElementById('logradouro').readOnly = false;
+          }
+        })
+        .catch(error => {
+          console.error(error);
+          document.getElementById('estado').readOnly = false;
+          document.getElementById('municipio').readOnly = false;
+          document.getElementById('bairro').readOnly = false;
+          document.getElementById('logradouro').readOnly = false;
+        });
+    });
+
+    // Submete o formulário com validações e conversão da data
+    document.getElementById('cadastroForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // Validação e conversão da data de nascimento
+      const dataNascimentoStr = document.getElementById('data_nascimento').value.trim();
+      const regex = /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+      if (!regex.test(dataNascimentoStr)) {
+        alert("Por favor, informe a data no formato DD/MM/AAAA.");
+        return;
+      }
+      const parsedDate = parseDate(dataNascimentoStr);
+      if (isNaN(parsedDate.getTime())) {
+        alert("Data de nascimento inválida.");
+        return;
+      }
+      const idade = calcularIdade(dataNascimentoStr);
+      if (idade < 18) {
+        alert("Você precisa ter no mínimo 18 anos para se cadastrar. Sua idade: " + idade);
+        return;
+      }
+      if (idade > 100) {
+        alert("Idade inválida. Você precisa ter menos de 100 anos. Sua idade: " + idade);
+        return;
+      }
+      
+      // Validação: se PCD for SIM, o laudo é obrigatório
+      const pcdValue = document.getElementById('pcd').value;
+      if (pcdValue === "true") {
+        const laudoInput = document.getElementById('laudo');
+        if (laudoInput.files.length === 0) {
+          alert("Anexo obrigatório para pessoa com deficiência (PCD).");
+          return;
+        }
+      }
+      
+      const mensagem = document.getElementById('mensagem');
+      mensagem.className = '';
+      const form = e.target;
+      const formData = new FormData(form);
+      // Remove a máscara do CPF
+      formData.set('cpf', form.cpf.value.replace(/\D/g, ''));
+      // Converte a data de nascimento para ISO (YYYY-MM-DD)
+      formData.set('data_nascimento', parsedDate.toISOString().split('T')[0]);
+      
+      try {
+        const response = await fetch('/api/candidatos/create', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (response.ok) {
+          mensagem.classList.add('alert', 'alert-success');
+          mensagem.textContent = 'Cadastro realizado com sucesso! Redirecionando...';
+          setTimeout(() => {
+            window.location.href = '/inscricao.html?cpf=' + form.cpf.value.replace(/\D/g, '');
+          }, 1500);
+        } else {
+          mensagem.classList.add('alert', 'alert-danger');
+          mensagem.textContent = result.error || 'Erro no cadastro';
+        }
+      } catch (error) {
+        console.error(error);
+        mensagem.classList.add('alert', 'alert-danger');
+        mensagem.textContent = "Erro ao conectar com o servidor.";
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
