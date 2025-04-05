@@ -104,9 +104,10 @@
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
-              <div id="docEscolaridade" class="mb-3" style="display: none;">
+              <!-- Sempre exibir comprovante de escolaridade e torná-lo obrigatório -->
+              <div id="docEscolaridade" class="mb-3" style="display: block;">
                 <label class="form-label" id="labelEscolaridade">COMPROVANTE DE ESCOLARIDADE</label>
-                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png">
+                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png" required>
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
@@ -198,7 +199,6 @@
     const form = document.getElementById('inscricaoForm');
 
     // Mapeamento dos valores do dropdown para os valores armazenados no banco
-    // Agora as chaves correspondem exatamente aos valores do dropdown
     const zoneMapping = {
       "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
       "RURAL/IPANEMA": "RURAL/IPANEMA",
@@ -216,7 +216,7 @@
     // Busca cargos quando seleciona zona
     zonaSelect.addEventListener('change', async function() {
       const zona = this.value;
-      // Converte usando o mapeamento (neste caso, será o mesmo valor)
+      // Converte usando o mapeamento
       const mappedZona = zoneMapping[zona] || zona;
       
       if (!mappedZona) {
@@ -275,16 +275,22 @@
       requisitosDiv.style.display = 'block';
       requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
 
-      // Configura documentos
+      // Para ambos os níveis, o comprovante de escolaridade é obrigatório.
+      document.getElementById('docEscolaridade').style.display = 'block';
+      document.getElementById('docEscolaridade').querySelector('input').required = true;
+      
+      // Para cargos de nível superior, exibe também o diploma e o torna obrigatório.
       const isProfessor = option.text.toUpperCase().includes('PROFESSOR');
       const isSuperior = option.dataset.nivel === 'superior';
       
-      // Escolaridade/Diploma
-      document.getElementById('docEscolaridade').style.display = isSuperior ? 'none' : 'block';
-      document.getElementById('docDiploma').style.display = isSuperior ? 'block' : 'none';
-      document.getElementById('labelEscolaridade').textContent = 
-        option.dataset.nivel === 'basico' ? 'COMPROVANTE DE ESCOLARIDADE' : 'DIPLOMA DE GRADUAÇÃO';
-
+      if (isSuperior) {
+        document.getElementById('docDiploma').style.display = 'block';
+        document.getElementById('docDiploma').querySelector('input').required = true;
+      } else {
+        document.getElementById('docDiploma').style.display = 'none';
+        document.getElementById('docDiploma').querySelector('input').required = false;
+      }
+      
       // Documentos específicos
       const docEspecifico = document.getElementById('docEspecifico');
       docEspecifico.style.display = 'none';
