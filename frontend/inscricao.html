@@ -55,16 +55,17 @@
             <h5 class="mb-3">1. SELECIONE A ZONA</h5>
             <select class="form-select" id="zona" name="zona" required>
               <option value="">SELECIONE A ZONA</option>
-              <option value="RIBEIRINHA">RIBEIRINHA</option>
-              <option value="TAMUATAI">TAMUATAI</option>
-              <option value="ITAMUCURI">ITAMUCURI</option>
-              <option value="IPANEMA">IPANEMA</option>
-              <option value="GUAJARÁ">GUAJARÁ</option>
-              <option value="BOA VISTA DO CUÇARI">BOA VISTA DO CUÇARI</option>
-              <option value="SANTA MARIA">SANTA MARIA</option>
-              <option value="PACOVAL">PACOVAL</option>
-              <option value="COLÔNIA DE CIMA">COLÔNIA DE CIMA</option>
-              <option value="COLÔNIA DE BAIXO">COLÔNIA DE BAIXO</option>
+              <option value="RURAL/ITAMUCURI">RURAL/ITAMUCURI</option>
+              <option value="RURAL/IPANEMA">RURAL/IPANEMA</option>
+              <option value="URBANA/SEDE">URBANA/SEDE</option>
+              <option value="RURAL/SANTA MARIA DO URUARÁ">RURAL/SANTA MARIA DO URUARÁ</option>
+              <option value="RURAL/PACOVAL">RURAL/PACOVAL</option>
+              <option value="RURAL/COLÔNIA DE CIMA">RURAL/COLÔNIA DE CIMA</option>
+              <option value="RURAL/GUAJARÁ">RURAL/GUAJARÁ</option>
+              <option value="RURAL/BOA VISTA DO CUÇARI">RURAL/BOA VISTA DO CUÇARI</option>
+              <option value="RURAL/TAMUATAÍ">RURAL/TAMUATAÍ</option>
+              <option value="RURAL/COLÔNIA DE BAIXO">RURAL/COLÔNIA DE BAIXO</option>
+              <option value="RURAL/RIBEIRINHA">RURAL/RIBEIRINHA</option>
             </select>
           </div>
 
@@ -196,10 +197,29 @@
     const documentosSection = document.getElementById('documentosSection');
     const form = document.getElementById('inscricaoForm');
 
+    // Mapeamento dos valores do dropdown para os valores armazenados no banco
+    // Agora as chaves correspondem exatamente aos valores do dropdown
+    const zoneMapping = {
+      "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
+      "RURAL/IPANEMA": "RURAL/IPANEMA",
+      "URBANA/SEDE": "URBANA/SEDE",
+      "RURAL/SANTA MARIA DO URUARÁ": "RURAL/SANTA MARIA DO URUARÁ",
+      "RURAL/PACOVAL": "RURAL/PACOVAL",
+      "RURAL/COLÔNIA DE CIMA": "RURAL/COLÔNIA DE CIMA",
+      "RURAL/GUAJARÁ": "RURAL/GUAJARÁ",
+      "RURAL/BOA VISTA DO CUÇARI": "RURAL/BOA VISTA DO CUÇARI",
+      "RURAL/TAMUATAÍ": "RURAL/TAMUATAÍ",
+      "RURAL/COLÔNIA DE BAIXO": "RURAL/COLÔNIA DE BAIXO",
+      "RURAL/RIBEIRINHA": "RURAL/RIBEIRINHA"
+    };
+
     // Busca cargos quando seleciona zona
     zonaSelect.addEventListener('change', async function() {
       const zona = this.value;
-      if (!zona) {
+      // Converte usando o mapeamento (neste caso, será o mesmo valor)
+      const mappedZona = zoneMapping[zona] || zona;
+      
+      if (!mappedZona) {
         cargoSelect.innerHTML = '<option value="">SELECIONE A ZONA PRIMEIRO</option>';
         cargoSelect.disabled = true;
         documentosSection.style.display = 'none';
@@ -211,7 +231,7 @@
       loadingCargos.style.display = 'block';
       
       try {
-        const response = await fetch(`/api/cargos?zona=${encodeURIComponent(zona)}`);
+        const response = await fetch(`/api/cargos?zona=${encodeURIComponent(mappedZona)}`);
         if (!response.ok) throw new Error('Erro ao carregar cargos');
         
         const result = await response.json();
@@ -230,7 +250,7 @@
             );
             option.dataset.requisitos = cargo.requisitos;
             option.dataset.nivel = cargo.nivel.includes('NÍVEL I') ? 'superior' : 
-                                 cargo.nivel.includes('NÍVEL II') ? 'superior' : 'basico';
+                                     cargo.nivel.includes('NÍVEL II') ? 'superior' : 'basico';
             cargoSelect.add(option);
           });
         }
