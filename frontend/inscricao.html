@@ -104,10 +104,10 @@
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
-              <!-- Sempre exibir comprovante de escolaridade e torná-lo obrigatório -->
+              <!-- Comprovante de Escolaridade: obrigatório somente se nível não for FUNDAMENTAL INCOMPLETO -->
               <div id="docEscolaridade" class="mb-3" style="display: block;">
                 <label class="form-label" id="labelEscolaridade">COMPROVANTE DE ESCOLARIDADE</label>
-                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png" required>
+                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
@@ -198,7 +198,7 @@
     const documentosSection = document.getElementById('documentosSection');
     const form = document.getElementById('inscricaoForm');
 
-    // Mapeamento dos valores do dropdown para os valores armazenados no banco
+    // Mapeamento dos valores do dropdown para os valores armazenados no banco (já estão iguais)
     const zoneMapping = {
       "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
       "RURAL/IPANEMA": "RURAL/IPANEMA",
@@ -248,9 +248,10 @@
               `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`, 
               cargo.id
             );
+            // Armazena o nível exatamente como está no banco, por exemplo:
+            // "NÍVEL FUNDAMENTAL INCOMPLETO", "NÍVEL FUNDAMENTAL COMPLETO" ou "NÍVEL SUPERIOR"
+            option.dataset.nivel = cargo.nivel;
             option.dataset.requisitos = cargo.requisitos;
-            option.dataset.nivel = cargo.nivel.includes('NÍVEL I') ? 'superior' : 
-                                     cargo.nivel.includes('NÍVEL II') ? 'superior' : 'basico';
             cargoSelect.add(option);
           });
         }
@@ -275,15 +276,18 @@
       requisitosDiv.style.display = 'block';
       requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
 
-      // Para ambos os níveis, o comprovante de escolaridade é obrigatório.
+      // Comprovante de escolaridade: obrigatório somente se o nível NÃO for "NÍVEL FUNDAMENTAL INCOMPLETO"
+      const docEscolaridadeInput = document.getElementById('docEscolaridade').querySelector('input');
+      if (option.dataset.nivel === "NÍVEL FUNDAMENTAL INCOMPLETO") {
+        docEscolaridadeInput.required = false;
+      } else {
+        docEscolaridadeInput.required = true;
+      }
       document.getElementById('docEscolaridade').style.display = 'block';
-      document.getElementById('docEscolaridade').querySelector('input').required = true;
       
       // Para cargos de nível superior, exibe também o diploma e o torna obrigatório.
       const isProfessor = option.text.toUpperCase().includes('PROFESSOR');
-      const isSuperior = option.dataset.nivel === 'superior';
-      
-      if (isSuperior) {
+      if (isProfessor && option.dataset.nivel !== "NÍVEL FUNDAMENTAL INCOMPLETO") {
         document.getElementById('docDiploma').style.display = 'block';
         document.getElementById('docDiploma').querySelector('input').required = true;
       } else {
