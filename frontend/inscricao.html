@@ -82,18 +82,25 @@
             </div>
           </div>
 
-          <!-- Campo Tempo de Serviço -->
+          <!-- Campo Tempo de Serviço e Comprovação de CTPS -->
           <div class="mb-4">
             <h5 class="mb-3">TEMPO DE SERVIÇO</h5>
-            <div class="mb-3">
-              <label for="tempo_servico" class="form-label">Anos de experiência na área</label>
-              <input type="number" class="form-control" id="tempo_servico" name="tempo_servico" min="0" max="50" required>
+            <div class="row">
+              <div class="col-md-6">
+                <label for="tempo_servico" class="form-label">Anos de experiência na área</label>
+                <input type="number" class="form-control" id="tempo_servico" name="tempo_servico" min="0" max="50" required>
+              </div>
+              <div class="col-md-6" id="ctpsField" style="display: none;">
+                <label for="doc_experiencia" class="form-label">COMPROVAÇÃO DE TEMPO DE EXERCÍCIO (CTPS)</label>
+                <input type="file" class="form-control" id="doc_experiencia" name="doc_experiencia" accept=".pdf,.jpg,.png">
+                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB). Quantidade máxima: 1 comprovante.</div>
+              </div>
             </div>
           </div>
 
-          <!-- Seção Documentos Obrigatórios -->
+          <!-- Seção Documentos Obrigatórios (demais documentos) -->
           <div id="documentosSection" style="display: none;">
-            <h5 class="mb-3">3. ANEXE OS DOCUMENTOS OBRIGATÓRIOS</h5>
+            <h5 class="mb-3">3. ANEXE OS DEMAIS DOCUMENTOS OBRIGATÓRIOS</h5>
             
             <div class="document-section">
               <div class="mb-3">
@@ -125,41 +132,36 @@
             </div>
           </div>
 
-          <!-- Seção Documentos Opcionais para Ganho de Pontos (Critérios de Avaliação) -->
+          <!-- Seção Documentos para Pontuação (Critérios de Avaliação) -->
           <div id="criteriosSection" style="display: none;">
             <h5 class="mb-3">4. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
             <div class="document-section">
               <div class="mb-3">
                 <label class="form-label">CERTIFICADO DE CONCLUSÃO DO NÍVEL FUNDAMENTAL</label>
                 <input type="file" class="form-control" name="doc_fundamental" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                <div class="file-info">Máximo 1 comprovação.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">CERTIFICADO DE CONCLUSÃO DO ENSINO MÉDIO</label>
                 <input type="file" class="form-control" name="doc_medio" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                <div class="file-info">Máximo 1 comprovação.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">CURSOS COMPLEMENTARES</label>
                 <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                <div class="file-info">Máximo 2 comprovações.</div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">TEMPO DE EXERCÍCIO (CTPS)</label>
-                <input type="file" class="form-control" name="doc_experiencia" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
-              </div>
-              <!-- Campos adicionais para cargos de NÍVEL SUPERIOR -->
+              <!-- Para cargos de Nível Superior -->
               <div id="superiorFields" style="display: none;">
                 <div class="mb-3">
                   <label class="form-label">PÓS GRADUAÇÃO/ESPECIALIZAÇÃO</label>
                   <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                  <div class="file-info">Máximo 2 comprovações.</div>
                 </div>
                 <div class="mb-3">
                   <label class="form-label">CURSO DE QUALIFICAÇÃO</label>
                   <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                  <div class="file-info">Máximo 2 comprovações.</div>
                 </div>
               </div>
             </div>
@@ -208,6 +210,8 @@
     const documentosSection = document.getElementById('documentosSection');
     const criteriosSection = document.getElementById('criteriosSection');
     const form = document.getElementById('inscricaoForm');
+    const ctpsField = document.getElementById('ctpsField');
+    const tempoInput = document.getElementById('tempo_servico');
 
     // Mapeamento dos valores do dropdown para os valores armazenados no banco
     const zoneMapping = {
@@ -224,10 +228,21 @@
       "RURAL/RIBEIRINHA": "RURAL/RIBEIRINHA"
     };
 
+    // Verifica o campo TEMPO DE SERVIÇO e exibe/oculta a comprovação de CTPS
+    tempoInput.addEventListener('change', function() {
+      const tempo = parseFloat(this.value);
+      if (tempo > 0) {
+        ctpsField.style.display = 'block';
+        document.getElementById('doc_experiencia').required = true;
+      } else {
+        ctpsField.style.display = 'none';
+        document.getElementById('doc_experiencia').required = false;
+      }
+    });
+
     // Busca cargos quando seleciona zona
     zonaSelect.addEventListener('change', async function() {
       const zona = this.value;
-      // Converte usando o mapeamento
       const mappedZona = zoneMapping[zona] || zona;
       
       if (!mappedZona) {
@@ -260,8 +275,7 @@
               `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`, 
               cargo.id
             );
-            // Armazena o nível exatamente como está no banco
-            option.dataset.nivel = cargo.nivel;
+            option.dataset.nivel = cargo.nivel; // Ex: "NÍVEL FUNDAMENTAL INCOMPLETO", etc.
             option.dataset.requisitos = cargo.requisitos;
             cargoSelect.add(option);
           });
@@ -284,7 +298,7 @@
         return;
       }
 
-      // Mostra requisitos
+      // Exibe os requisitos
       requisitosDiv.style.display = 'block';
       requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
 
@@ -297,7 +311,7 @@
       }
       document.getElementById('docEscolaridade').style.display = 'block';
       
-      // Para cargos de nível superior, exibe também o diploma e o torna obrigatório.
+      // Para cargos de nível superior, exibe o diploma e o torna obrigatório.
       const isProfessor = option.text.toUpperCase().includes('PROFESSOR');
       if (isProfessor && option.dataset.nivel !== "NÍVEL FUNDAMENTAL INCOMPLETO") {
         document.getElementById('docDiploma').style.display = 'block';
@@ -317,14 +331,12 @@
 
       // Exibe ou oculta os campos da seção de critérios de avaliação (documentos opcionais para pontuação)
       criteriosSection.style.display = 'block';
-      // Se o cargo for de nível superior, mostra campos adicionais
       if (option.dataset.nivel === "NÍVEL SUPERIOR") {
         document.getElementById('superiorFields').style.display = 'block';
       } else {
         document.getElementById('superiorFields').style.display = 'none';
       }
 
-      // Exibe as seções de documentos obrigatórios e opcionais
       documentosSection.style.display = 'block';
     });
 
@@ -349,12 +361,13 @@
         // Cria FormData diretamente do formulário
         const formData = new FormData(form);
 
-        // Verifica tamanhos dos arquivos
+        // Verifica tamanhos dos arquivos (incluindo os novos campos de critérios)
         const fileFields = [
           'doc_identidade', 'doc_escolaridade', 'doc_diploma', 
           'doc_especifico', 'doc_especializacao', 'doc_mestrado', 
           'doc_doutorado', 'doc_plano_aula', 'doc_fundamental',
-          'doc_medio', 'doc_cursos', 'doc_experiencia', 'doc_pos', 'doc_qualificacao'
+          'doc_medio', 'doc_cursos', 'doc_pos', 'doc_qualificacao',
+          'doc_experiencia'
         ];
 
         for (const field of fileFields) {
@@ -370,6 +383,11 @@
         // Verifica documento de identidade obrigatório
         if (!formData.get('doc_identidade')) {
           throw new Error('Documento de identidade (RG/CNH) é obrigatório');
+        }
+
+        // Se o tempo de serviço for maior que 0, é obrigatório comprovar o tempo (CTPS)
+        if (parseFloat(tempoInput.value) > 0 && !formData.get('doc_experiencia')) {
+          throw new Error('Para tempo de serviço informado, é obrigatória a comprovação de tempo de exercício (CTPS).');
         }
 
         // Envia para a API
