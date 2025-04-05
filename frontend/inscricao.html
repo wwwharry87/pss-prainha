@@ -93,15 +93,14 @@
               <div class="col-md-6" id="ctpsField" style="display: none;">
                 <label for="doc_experiencia" class="form-label">COMPROVAÇÃO DE TEMPO DE EXERCÍCIO (CTPS)</label>
                 <input type="file" class="form-control" id="doc_experiencia" name="doc_experiencia" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB). Quantidade máxima: 1 comprovante.</div>
+                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB). (Máximo 1 comprovação)</div>
               </div>
             </div>
           </div>
 
-          <!-- Seção Documentos Obrigatórios (demais documentos) -->
+          <!-- Seção Documentos Obrigatórios -->
           <div id="documentosSection" style="display: none;">
-            <h5 class="mb-3">3. ANEXE OS DEMAIS DOCUMENTOS OBRIGATÓRIOS</h5>
-            
+            <h5 class="mb-3">3. ANEXE OS DOCUMENTOS OBRIGATÓRIOS</h5>
             <div class="document-section">
               <div class="mb-3">
                 <label class="form-label">RG OU CNH</label>
@@ -109,7 +108,7 @@
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
-              <!-- Comprovante de Escolaridade: obrigatório somente se o cargo não for FUNDAMENTAL INCOMPLETO -->
+              <!-- Comprovante de Escolaridade: obrigatório se o cargo NÃO for FUNDAMENTAL INCOMPLETO -->
               <div id="docEscolaridade" class="mb-3" style="display: block;">
                 <label class="form-label" id="labelEscolaridade">COMPROVANTE DE ESCOLARIDADE</label>
                 <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png">
@@ -136,32 +135,43 @@
           <div id="criteriosSection" style="display: none;">
             <h5 class="mb-3">4. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
             <div class="document-section">
+              <!-- Certificado de Conclusão com seleção de tipo -->
               <div class="mb-3">
-                <label class="form-label">CERTIFICADO DE CONCLUSÃO DO NÍVEL FUNDAMENTAL</label>
-                <input type="file" class="form-control" name="doc_fundamental" accept=".pdf,.jpg,.png">
-                <div class="file-info">Máximo 1 comprovação.</div>
+                <label class="form-label">CERTIFICADO DE CONCLUSÃO</label>
+                <div class="input-group">
+                  <select class="form-select" id="tipoCertificado" name="tipo_certificado">
+                    <option value="">Selecione o tipo</option>
+                    <option value="FUNDAMENTAL/EJA">FUNDAMENTAL/EJA</option>
+                    <option value="MÉDIO/EJA">MÉDIO/EJA</option>
+                    <option value="SUPERIOR">SUPERIOR</option>
+                  </select>
+                  <input type="file" class="form-control" name="doc_certificado" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="file-info">Envie 1 arquivo referente ao certificado de conclusão.</div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">CERTIFICADO DE CONCLUSÃO DO ENSINO MÉDIO</label>
-                <input type="file" class="form-control" name="doc_medio" accept=".pdf,.jpg,.png">
-                <div class="file-info">Máximo 1 comprovação.</div>
-              </div>
+              <!-- Cursos Complementares (permite múltiplos arquivos, até 2) -->
               <div class="mb-3">
                 <label class="form-label">CURSOS COMPLEMENTARES</label>
-                <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-                <div class="file-info">Máximo 2 comprovações.</div>
+                <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png" multiple>
+                <div class="file-info">Envie até 2 arquivos.</div>
               </div>
-              <!-- Para cargos de Nível Superior -->
+              <!-- Demais documentos opcionais -->
+              <div class="mb-3">
+                <label class="form-label">OUTROS DOCUMENTOS PARA PONTUAÇÃO</label>
+                <input type="file" class="form-control" name="doc_outros" accept=".pdf,.jpg,.png" multiple>
+                <div class="file-info">Envie os documentos adicionais conforme os critérios (limite conforme edital).</div>
+              </div>
+              <!-- Campos adicionais para cargos de Nível Superior -->
               <div id="superiorFields" style="display: none;">
                 <div class="mb-3">
                   <label class="form-label">PÓS GRADUAÇÃO/ESPECIALIZAÇÃO</label>
-                  <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Máximo 2 comprovações.</div>
+                  <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png" multiple>
+                  <div class="file-info">Envie até 2 arquivos.</div>
                 </div>
                 <div class="mb-3">
                   <label class="form-label">CURSO DE QUALIFICAÇÃO</label>
-                  <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Máximo 2 comprovações.</div>
+                  <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png" multiple>
+                  <div class="file-info">Envie até 2 arquivos.</div>
                 </div>
               </div>
             </div>
@@ -275,7 +285,8 @@
               `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`, 
               cargo.id
             );
-            option.dataset.nivel = cargo.nivel; // Ex: "NÍVEL FUNDAMENTAL INCOMPLETO", etc.
+            // Armazena o nível exatamente como está no banco, por exemplo "NÍVEL FUNDAMENTAL INCOMPLETO", "NÍVEL FUNDAMENTAL COMPLETO" ou "NÍVEL SUPERIOR"
+            option.dataset.nivel = cargo.nivel;
             option.dataset.requisitos = cargo.requisitos;
             cargoSelect.add(option);
           });
@@ -329,8 +340,9 @@
         document.getElementById('labelDocEspecifico').textContent = 'CNH CATEGORIA D';
       }
 
-      // Exibe ou oculta os campos da seção de critérios de avaliação (documentos opcionais para pontuação)
+      // Exibe ou oculta a seção de documentos para pontuação
       criteriosSection.style.display = 'block';
+      // Se o cargo for de nível superior, mostra os campos adicionais
       if (option.dataset.nivel === "NÍVEL SUPERIOR") {
         document.getElementById('superiorFields').style.display = 'block';
       } else {
@@ -367,15 +379,18 @@
           'doc_especifico', 'doc_especializacao', 'doc_mestrado', 
           'doc_doutorado', 'doc_plano_aula', 'doc_fundamental',
           'doc_medio', 'doc_cursos', 'doc_pos', 'doc_qualificacao',
-          'doc_experiencia'
+          'doc_experiencia', 'doc_certificado'
         ];
 
         for (const field of fileFields) {
           const fileInput = form.querySelector(`[name="${field}"]`);
-          if (fileInput && fileInput.files[0]) {
+          if (fileInput && fileInput.files.length > 0) {
             const maxSize = field === 'doc_plano_aula' ? MAX_PLANO_SIZE : MAX_SIZE;
-            if (fileInput.files[0].size > maxSize) {
-              throw new Error(`O arquivo ${field.replace(/_/g, ' ')} excede o tamanho máximo de ${maxSize/(1024*1024)}MB`);
+            // Para inputs com múltiplos arquivos, verifica cada um
+            for (let i = 0; i < fileInput.files.length; i++) {
+              if (fileInput.files[i].size > maxSize) {
+                throw new Error(`O arquivo ${field.replace(/_/g, ' ')} excede o tamanho máximo de ${maxSize/(1024*1024)}MB`);
+              }
             }
           }
         }
