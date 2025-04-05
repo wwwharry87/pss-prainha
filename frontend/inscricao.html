@@ -91,66 +91,76 @@
             </div>
           </div>
 
-          <!-- Seção Documentos -->
+          <!-- Seção Documentos Obrigatórios -->
           <div id="documentosSection" style="display: none;">
-            <h5 class="mb-3">3. ANEXE OS DOCUMENTOS</h5>
+            <h5 class="mb-3">3. ANEXE OS DOCUMENTOS OBRIGATÓRIOS</h5>
             
-            <!-- Documentos Obrigatórios -->
             <div class="document-section">
-              <h6>DOCUMENTOS OBRIGATÓRIOS <span class="badge required-badge ms-2">OBRIGATÓRIO</span></h6>
               <div class="mb-3">
                 <label class="form-label">RG OU CNH</label>
                 <input type="file" class="form-control" name="doc_identidade" accept=".pdf,.jpg,.png" required>
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
-              <!-- Comprovante de Escolaridade: obrigatório somente se nível não for FUNDAMENTAL INCOMPLETO -->
+              <!-- Comprovante de Escolaridade: obrigatório somente se o cargo não for FUNDAMENTAL INCOMPLETO -->
               <div id="docEscolaridade" class="mb-3" style="display: block;">
                 <label class="form-label" id="labelEscolaridade">COMPROVANTE DE ESCOLARIDADE</label>
                 <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
+              <!-- Diploma de Graduação: obrigatório para cargos de nível superior -->
               <div id="docDiploma" class="mb-3" style="display: none;">
                 <label class="form-label" id="labelDiploma">DIPLOMA DE GRADUAÇÃO</label>
                 <input type="file" class="form-control" name="doc_diploma" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               
+              <!-- Documento Adicional (ex: para Motorista) -->
               <div id="docEspecifico" class="mb-3" style="display: none;">
                 <label class="form-label" id="labelDocEspecifico">DOCUMENTO ADICIONAL</label>
                 <input type="file" class="form-control" name="doc_especifico" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
             </div>
+          </div>
 
-            <!-- Formação Avançada -->
-            <div id="formacaoAvancadaSection" class="document-section" style="display: none;">
-              <h6>FORMAÇÃO AVANÇADA <span class="badge optional-badge ms-2">OPCIONAL</span></h6>
+          <!-- Seção Documentos Opcionais para Ganho de Pontos (Critérios de Avaliação) -->
+          <div id="criteriosSection" style="display: none;">
+            <h5 class="mb-3">4. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
+            <div class="document-section">
               <div class="mb-3">
-                <label class="form-label">DIPLOMA DE ESPECIALIZAÇÃO</label>
-                <input type="file" class="form-control" name="doc_especializacao" accept=".pdf,.jpg,.png">
+                <label class="form-label">CERTIFICADO DE CONCLUSÃO DO NÍVEL FUNDAMENTAL</label>
+                <input type="file" class="form-control" name="doc_fundamental" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               <div class="mb-3">
-                <label class="form-label">DIPLOMA DE MESTRADO</label>
-                <input type="file" class="form-control" name="doc_mestrado" accept=".pdf,.jpg,.png">
+                <label class="form-label">CERTIFICADO DE CONCLUSÃO DO ENSINO MÉDIO</label>
+                <input type="file" class="form-control" name="doc_medio" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
               <div class="mb-3">
-                <label class="form-label">DIPLOMA DE DOUTORADO</label>
-                <input type="file" class="form-control" name="doc_doutorado" accept=".pdf,.jpg,.png">
+                <label class="form-label">CURSOS COMPLEMENTARES</label>
+                <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
                 <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
               </div>
-            </div>
-            
-            <!-- Plano de Aula -->
-            <div id="planoAulaSection" class="document-section" style="display: none;">
-              <h6>PLANO DE AULA <span class="badge required-badge ms-2">OBRIGATÓRIO</span></h6>
               <div class="mb-3">
-                <label class="form-label">PLANO DE AULA (PDF)</label>
-                <input type="file" class="form-control" name="doc_plano_aula" accept=".pdf">
-                <div class="file-info">Formato: PDF (máximo 5MB)</div>
+                <label class="form-label">TEMPO DE EXERCÍCIO (CTPS)</label>
+                <input type="file" class="form-control" name="doc_experiencia" accept=".pdf,.jpg,.png">
+                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+              </div>
+              <!-- Campos adicionais para cargos de NÍVEL SUPERIOR -->
+              <div id="superiorFields" style="display: none;">
+                <div class="mb-3">
+                  <label class="form-label">PÓS GRADUAÇÃO/ESPECIALIZAÇÃO</label>
+                  <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
+                  <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">CURSO DE QUALIFICAÇÃO</label>
+                  <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
+                  <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                </div>
               </div>
             </div>
           </div>
@@ -196,9 +206,10 @@
     const requisitosDiv = document.getElementById('requisitosCargo');
     const loadingCargos = document.getElementById('loadingCargos');
     const documentosSection = document.getElementById('documentosSection');
+    const criteriosSection = document.getElementById('criteriosSection');
     const form = document.getElementById('inscricaoForm');
 
-    // Mapeamento dos valores do dropdown para os valores armazenados no banco (já estão iguais)
+    // Mapeamento dos valores do dropdown para os valores armazenados no banco
     const zoneMapping = {
       "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
       "RURAL/IPANEMA": "RURAL/IPANEMA",
@@ -223,6 +234,7 @@
         cargoSelect.innerHTML = '<option value="">SELECIONE A ZONA PRIMEIRO</option>';
         cargoSelect.disabled = true;
         documentosSection.style.display = 'none';
+        criteriosSection.style.display = 'none';
         return;
       }
       
@@ -248,8 +260,7 @@
               `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`, 
               cargo.id
             );
-            // Armazena o nível exatamente como está no banco, por exemplo:
-            // "NÍVEL FUNDAMENTAL INCOMPLETO", "NÍVEL FUNDAMENTAL COMPLETO" ou "NÍVEL SUPERIOR"
+            // Armazena o nível exatamente como está no banco
             option.dataset.nivel = cargo.nivel;
             option.dataset.requisitos = cargo.requisitos;
             cargoSelect.add(option);
@@ -269,6 +280,7 @@
       const option = this.options[this.selectedIndex];
       if (!option.value) {
         documentosSection.style.display = 'none';
+        criteriosSection.style.display = 'none';
         return;
       }
 
@@ -295,7 +307,7 @@
         document.getElementById('docDiploma').querySelector('input').required = false;
       }
       
-      // Documentos específicos
+      // Documentos específicos para Motorista
       const docEspecifico = document.getElementById('docEspecifico');
       docEspecifico.style.display = 'none';
       if (option.text.toUpperCase().includes('MOTORISTA')) {
@@ -303,23 +315,16 @@
         document.getElementById('labelDocEspecifico').textContent = 'CNH CATEGORIA D';
       }
 
-      // Formação avançada e Plano de Aula (somente para professores)
-      const planoAulaSection = document.getElementById('planoAulaSection');
-      const planoAulaInput = document.querySelector('[name="doc_plano_aula"]');
-      if (isProfessor) {
-        planoAulaSection.style.display = 'block';
-        planoAulaInput.required = true;
-        planoAulaInput.disabled = false;
+      // Exibe ou oculta os campos da seção de critérios de avaliação (documentos opcionais para pontuação)
+      criteriosSection.style.display = 'block';
+      // Se o cargo for de nível superior, mostra campos adicionais
+      if (option.dataset.nivel === "NÍVEL SUPERIOR") {
+        document.getElementById('superiorFields').style.display = 'block';
       } else {
-        planoAulaSection.style.display = 'none';
-        planoAulaInput.required = false;
-        planoAulaInput.disabled = true;
-        planoAulaInput.value = "";
+        document.getElementById('superiorFields').style.display = 'none';
       }
-      
-      // Exibe ou oculta seção de formação avançada (somente para professores)
-      document.getElementById('formacaoAvancadaSection').style.display = isProfessor ? 'block' : 'none';
 
+      // Exibe as seções de documentos obrigatórios e opcionais
       documentosSection.style.display = 'block';
     });
 
@@ -348,7 +353,8 @@
         const fileFields = [
           'doc_identidade', 'doc_escolaridade', 'doc_diploma', 
           'doc_especifico', 'doc_especializacao', 'doc_mestrado', 
-          'doc_doutorado', 'doc_plano_aula'
+          'doc_doutorado', 'doc_plano_aula', 'doc_fundamental',
+          'doc_medio', 'doc_cursos', 'doc_experiencia', 'doc_pos', 'doc_qualificacao'
         ];
 
         for (const field of fileFields) {
