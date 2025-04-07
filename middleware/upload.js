@@ -5,7 +5,8 @@ const fs = require('fs');
 
 const storage = multer.diskStorage({
   destination: function(req, file, cb) {
-    const uploadDir = 'uploads/';
+    // Usa a variável de ambiente UPLOADS_DIR ou, se não definida, utiliza a pasta local "uploads/"
+    const uploadDir = process.env.UPLOADS_DIR || 'uploads/';
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -51,7 +52,7 @@ const handleUploadCandidatos = (req, res, next) => {
   });
 };
 
-// Middleware para inscrições: agora incluindo todos os campos que o formulário pode enviar, limite global 5MB
+// Middleware para inscrições: incluindo todos os campos que o formulário pode enviar, limite global 5MB
 const uploadInscricoes = multer({
   storage: storage,
   fileFilter: fileFilter,
