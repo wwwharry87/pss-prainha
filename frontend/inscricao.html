@@ -37,6 +37,13 @@
     @keyframes spinner-border {
       to { transform: rotate(360deg); }
     }
+    .refresh-message {
+      background-color: #fff3cd;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -44,6 +51,10 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h2 class="card-title text-center mb-4">INSCRIÇÃO PSS</h2>
+        
+        <div id="refreshMessage" class="refresh-message">
+          <strong>Atenção:</strong> Os campos foram atualizados de acordo com o cargo selecionado. Por favor, verifique todos os campos antes de prosseguir.
+        </div>
         
         <form id="inscricaoForm" enctype="multipart/form-data">
           <!-- Campo oculto para CPF -->
@@ -114,85 +125,8 @@
           <!-- Seção 3: Documentos para Pontuação (Opcional) -->
           <div class="mb-4" id="criteriosSection" style="display: none;">
             <h5 class="section-title">3. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
-            <div class="document-section">
-              <!-- Grupos de Certificados (para níveis que não sejam Superior) -->
-              <div id="certificadoDefaultGroup" style="display: none;">
-                <label class="form-label">Certificado de Conclusão</label>
-                <div class="input-group">
-                  <input type="file" class="form-control" name="doc_certificado" accept=".pdf,.jpg,.png">
-                </div>
-                <div class="file-info">Envie 1 arquivo referente ao certificado.</div>
-              </div>
-              <div id="certificadoFundamentalGroup" style="display: none;">
-                <label class="form-label">Certificado de Conclusão do Nível Fundamental</label>
-                <input type="file" class="form-control" name="doc_certificado_fundamental" accept=".pdf,.jpg,.png">
-                <div class="file-info">Envie 1 arquivo referente ao certificado do nível fundamental.</div>
-              </div>
-              <div id="certificadoMedioGroup" style="display: none;">
-                <label class="form-label">Certificado de Conclusão do Ensino Médio</label>
-                <input type="file" class="form-control" name="doc_certificado_medio" accept=".pdf,.jpg,.png">
-                <div class="file-info">Envie 1 arquivo referente ao certificado do ensino médio.</div>
-              </div>
-              <div id="certificadoFundCompletoGroup" style="display: none;">
-                <label class="form-label">Certificado de Conclusão do Nível Médio ou Cursando</label>
-                <input type="file" class="form-control" name="doc_certificado_fund_completo" accept=".pdf,.jpg,.png">
-                <div class="file-info">Envie 1 arquivo referente ao certificado do nível médio ou cursando.</div>
-              </div>
-              
-              <!-- Cursos Complementares (para níveis que não sejam Superior) -->
-              <div class="mb-3" id="cursosComplementaresGroup">
-                <label class="form-label">Cursos Complementares</label>
-                <div id="cursosContainer"></div>
-                <div class="file-info">Cada curso deve comprovar o mínimo de horas necessárias.</div>
-              </div>
-              
-              <!-- Campo Tempo de Exercício -->
-              <div class="mb-3" id="tempoExercicioGroup">
-                <label class="form-label">Tempo de Exercício na Atividade Profissional</label>
-                <div class="input-group">
-                  <select class="form-select" id="tempo_exercicio_select" name="tempo_exercicio_select">
-                    <option value="">Selecione a opção</option>
-                    <option value="ate02">Até 02 Anos completos</option>
-                    <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
-                    <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
-                    <option value="mais06">Superior a 06 Anos completos</option>
-                  </select>
-                  <input type="file" class="form-control" id="doc_tempo_exercicio" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png" style="display: none;">
-                </div>
-                <div class="file-info">Anexe o documento comprobatório se desejar.</div>
-              </div>
-              
-              <!-- Campos adicionais para cargos de Nível Superior -->
-              <div id="superiorFields" style="display: none;">
-                <div class="mb-3">
-                  <label class="form-label">Pós-graduação/Especializações</label>
-                  <div>
-                    <!-- Removido os colchetes dos nomes -->
-                    <input type="file" class="form-control mb-2" name="doc_pos" accept=".pdf,.jpg,.png">
-                    <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
-                  </div>
-                  <div class="file-info">PDF, JPG, PNG</div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Mestrado</label>
-                  <input type="file" class="form-control" name="doc_mestrado" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Envie 1 arquivo referente ao Mestrado.</div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Doutorado</label>
-                  <input type="file" class="form-control" name="doc_doutorado" accept=".pdf,.jpg,.png">
-                  <div class="file-info">Envie 1 arquivo referente ao Doutorado.</div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Curso de Qualificação/APERFEIÇOAMENTO PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE</label>
-                  <div>
-                    <!-- Removido os colchetes -->
-                    <input type="file" class="form-control mb-2" name="doc_qualificacao" accept=".pdf,.jpg,.png">
-                    <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
-                  </div>
-                  <div class="file-info">Envie 2 arquivos referentes ao curso de qualificação.</div>
-                </div>
-              </div>
+            <div class="document-section" id="dynamicFieldsContainer">
+              <!-- Os campos serão carregados dinamicamente aqui -->
             </div>
           </div>
           
@@ -222,7 +156,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       
-      // Função para adicionar campos de upload dinamicamente (usada apenas em campos dinâmicos)
+      // Função para adicionar campos de upload dinamicamente
       function addField(containerId, inputName, maxAllowed) {
         const container = document.getElementById(containerId);
         const inputs = container.querySelectorAll(`input[name="${inputName}"]`);
@@ -264,16 +198,11 @@
       const loadingCargos = document.getElementById('loadingCargos');
       const documentosSection = document.getElementById('documentosSection');
       const criteriosSection = document.getElementById('criteriosSection');
+      const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
       const form = document.getElementById('inscricaoForm');
-      const tempoExercicioSelect = document.getElementById('tempo_exercicio_select');
-      const docTempoExercicioInput = document.getElementById('doc_tempo_exercicio');
+      const refreshMessage = document.getElementById('refreshMessage');
       
-      // Referência para o grupo de Tempo de Exercício e sua posição original
-      const tempoExercicioGroup = document.getElementById('tempoExercicioGroup');
-      const tempoExercicioOriginalParent = tempoExercicioGroup.parentNode;
-      const tempoExercicioOriginalNext = tempoExercicioGroup.nextElementSibling;
-      
-      // Mapeamento de zona (valores já são iguais)
+      // Mapeamento de zona
       const zoneMapping = {
         "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
         "RURAL/IPANEMA": "RURAL/IPANEMA",
@@ -341,12 +270,6 @@
         if (!option || !option.value) {
           documentosSection.style.display = 'none';
           criteriosSection.style.display = 'none';
-          // Esconde os grupos de certificado e cursos
-          document.getElementById('certificadoDefaultGroup').style.display = 'none';
-          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
-          document.getElementById('certificadoMedioGroup').style.display = 'none';
-          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
-          document.getElementById('cursosComplementaresGroup').style.display = 'none';
           return;
         }
         
@@ -356,15 +279,21 @@
           requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
         }
         
+        // Mostra a mensagem de atualização
+        refreshMessage.style.display = 'block';
+        
+        // Limpa os campos dinâmicos
+        dynamicFieldsContainer.innerHTML = '';
+        
         // Ajusta o campo de REQUISITOS MÍNIMOS DO CARGO (Comprovante de Escolaridade)
         const docEscolaridade = document.getElementById('docEscolaridade');
         if (docEscolaridade) {
+          docEscolaridade.style.display = 'block';
           const docEscolaridadeInput = docEscolaridade.querySelector('input');
           docEscolaridadeInput.required = true;
-          docEscolaridade.style.display = 'block';
         }
         
-        // Para cargos de Nível Superior, exibe "Plano de Aula" com limite de 5MB
+        // Para cargos de Nível Superior
         const docDiploma = document.getElementById('docDiploma');
         if (docDiploma) {
           if (option.dataset.nivel === "NÍVEL SUPERIOR") {
@@ -395,102 +324,190 @@
         }
         
         // Exibe a seção de Documentos para Pontuação
-        if (criteriosSection) {
-          criteriosSection.style.display = 'block';
-        }
+        criteriosSection.style.display = 'block';
         
-        // Ajusta os grupos de certificado e cursos conforme o nível:
-        if (option.dataset.nivel === "NÍVEL FUNDAMENTAL INCOMPLETO") {
-          document.getElementById('certificadoFundamentalGroup').style.display = 'block';
-          document.getElementById('certificadoMedioGroup').style.display = 'block';
-          document.getElementById('certificadoDefaultGroup').style.display = 'none';
-          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
-          document.getElementById('cursosComplementaresGroup').style.display = 'block';
-          document.getElementById('cursosContainer').innerHTML = `
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-          `;
-        } else if (option.dataset.nivel === "NÍVEL FUNDAMENTAL COMPLETO") {
-          document.getElementById('certificadoFundCompletoGroup').style.display = 'block';
-          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
-          document.getElementById('certificadoMedioGroup').style.display = 'none';
-          document.getElementById('certificadoDefaultGroup').style.display = 'none';
-          document.getElementById('cursosComplementaresGroup').style.display = 'block';
-          document.getElementById('cursosContainer').innerHTML = `
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-          `;
-        } else if (option.dataset.nivel === "NÍVEL SUPERIOR") {
-          // Para cargos de Nível Superior, não exibe Certificado de Conclusão e Cursos Complementares
-          document.getElementById('certificadoDefaultGroup').style.display = 'none';
-          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
-          document.getElementById('certificadoMedioGroup').style.display = 'none';
-          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
-          document.getElementById('cursosComplementaresGroup').style.display = 'none';
-          // Exibe os campos adicionais para Nível Superior
-          const superiorFields = document.getElementById('superiorFields');
-          if (superiorFields) {
-            superiorFields.style.display = 'block';
-          }
-          // Atualiza o rótulo e reposiciona o campo de Tempo de Exercício para o final
-          const tempoLabel = tempoExercicioGroup.querySelector('label');
-          if (tempoLabel) {
-            tempoLabel.innerHTML = 'TEMPO DE EXERCÍCIO NA ATIVIDADE PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE, SEM SOBREPOSIÇÃO DE TEMPO';
-          }
-          if (superiorFields) {
-            superiorFields.insertAdjacentElement('afterend', tempoExercicioGroup);
-          }
-        } else {
-          // Caso não seja nenhum dos anteriores, utiliza o padrão
-          document.getElementById('certificadoDefaultGroup').style.display = 'block';
-          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
-          document.getElementById('certificadoMedioGroup').style.display = 'none';
-          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
-          document.getElementById('cursosComplementaresGroup').style.display = 'block';
-          document.getElementById('cursosContainer').innerHTML = `
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-            <div class="input-group mb-2">
-              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
-            </div>
-          `;
-          // Restaura o campo de Tempo de Exercício para sua posição original (caso tenha sido movido)
-          const tempoLabel = tempoExercicioGroup.querySelector('label');
-          if (tempoLabel) {
-            tempoLabel.innerHTML = 'Tempo de Exercício na Atividade Profissional';
-          }
-          if (tempoExercicioOriginalNext) {
-            tempoExercicioOriginalParent.insertBefore(tempoExercicioGroup, tempoExercicioOriginalNext);
-          } else {
-            tempoExercicioOriginalParent.appendChild(tempoExercicioGroup);
-          }
-        }
+        // Cria os campos dinâmicos com base no nível do cargo
+        createDynamicFields(option.dataset.nivel);
+        
+        // Rola a página para o topo para mostrar a mensagem de atualização
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Esconde a mensagem após 5 segundos
+        setTimeout(() => {
+          refreshMessage.style.display = 'none';
+        }, 5000);
       });
       
-      // Controle do campo "Tempo de Exercício na Atividade Profissional"
-      tempoExercicioSelect.addEventListener('change', function() {
-        if (this.value !== "") {
-          docTempoExercicioInput.style.display = 'block';
-          // O campo não é definido como "required" para torná-lo opcional
-        } else {
-          docTempoExercicioInput.style.display = 'none';
+      // Função para criar campos dinâmicos com base no nível do cargo
+      function createDynamicFields(nivel) {
+        // Limpa os campos existentes
+        dynamicFieldsContainer.innerHTML = '';
+        
+        // Campos para Nível Fundamental Incompleto
+        if (nivel === "NÍVEL FUNDAMENTAL INCOMPLETO") {
+          dynamicFieldsContainer.innerHTML += `
+            <div class="mb-3">
+              <label class="form-label">Certificado de Conclusão do Nível Fundamental</label>
+              <input type="file" class="form-control" name="doc_certificado_fundamental" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao certificado do nível fundamental.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Certificado de Conclusão do Ensino Médio</label>
+              <input type="file" class="form-control" name="doc_certificado_medio" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao certificado do ensino médio.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Cursos Complementares</label>
+              <div id="cursosContainer">
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+              </div>
+              <div class="file-info">Cada curso deve comprovar o mínimo de horas necessárias.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tempo de Exercício na Atividade Profissional</label>
+              <div class="input-group">
+                <select class="form-select" name="tempo_exercicio_select">
+                  <option value="">Selecione a opção</option>
+                  <option value="ate02">Até 02 Anos completos</option>
+                  <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
+                  <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
+                  <option value="mais06">Superior a 06 Anos completos</option>
+                </select>
+                <input type="file" class="form-control" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">Anexe o documento comprobatório se desejar.</div>
+            </div>
+          `;
         }
-      });
+        // Campos para Nível Fundamental Completo
+        else if (nivel === "NÍVEL FUNDAMENTAL COMPLETO") {
+          dynamicFieldsContainer.innerHTML += `
+            <div class="mb-3">
+              <label class="form-label">Certificado de Conclusão do Nível Médio ou Cursando</label>
+              <input type="file" class="form-control" name="doc_certificado_fund_completo" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao certificado do nível médio ou cursando.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Cursos Complementares</label>
+              <div id="cursosContainer">
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+              </div>
+              <div class="file-info">Cada curso deve comprovar o mínimo de horas necessárias.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tempo de Exercício na Atividade Profissional</label>
+              <div class="input-group">
+                <select class="form-select" name="tempo_exercicio_select">
+                  <option value="">Selecione a opção</option>
+                  <option value="ate02">Até 02 Anos completos</option>
+                  <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
+                  <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
+                  <option value="mais06">Superior a 06 Anos completos</option>
+                </select>
+                <input type="file" class="form-control" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">Anexe o documento comprobatório se desejar.</div>
+            </div>
+          `;
+        }
+        // Campos para Nível Superior
+        else if (nivel === "NÍVEL SUPERIOR") {
+          dynamicFieldsContainer.innerHTML += `
+            <div class="mb-3">
+              <label class="form-label">Pós-graduação/Especializações</label>
+              <div>
+                <input type="file" class="form-control mb-2" name="doc_pos" accept=".pdf,.jpg,.png">
+                <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">PDF, JPG, PNG</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Mestrado</label>
+              <input type="file" class="form-control" name="doc_mestrado" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao Mestrado.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Doutorado</label>
+              <input type="file" class="form-control" name="doc_doutorado" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao Doutorado.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Curso de Qualificação/APERFEIÇOAMENTO PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE</label>
+              <div>
+                <input type="file" class="form-control mb-2" name="doc_qualificacao" accept=".pdf,.jpg,.png">
+                <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">Envie 2 arquivos referentes ao curso de qualificação.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">TEMPO DE EXERCÍCIO NA ATIVIDADE PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE, SEM SOBREPOSIÇÃO DE TEMPO</label>
+              <div class="input-group">
+                <select class="form-select" name="tempo_exercicio_select">
+                  <option value="">Selecione a opção</option>
+                  <option value="ate02">Até 02 Anos completos</option>
+                  <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
+                  <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
+                  <option value="mais06">Superior a 06 Anos completos</option>
+                </select>
+                <input type="file" class="form-control" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">Anexe o documento comprobatório se desejar.</div>
+            </div>
+          `;
+        }
+        // Campos padrão para outros níveis
+        else {
+          dynamicFieldsContainer.innerHTML += `
+            <div class="mb-3">
+              <label class="form-label">Certificado de Conclusão</label>
+              <input type="file" class="form-control" name="doc_certificado" accept=".pdf,.jpg,.png">
+              <div class="file-info">Envie 1 arquivo referente ao certificado.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Cursos Complementares</label>
+              <div id="cursosContainer">
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+                <div class="input-group mb-2">
+                  <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+                </div>
+              </div>
+              <div class="file-info">Cada curso deve comprovar o mínimo de horas necessárias.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tempo de Exercício na Atividade Profissional</label>
+              <div class="input-group">
+                <select class="form-select" name="tempo_exercicio_select">
+                  <option value="">Selecione a opção</option>
+                  <option value="ate02">Até 02 Anos completos</option>
+                  <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
+                  <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
+                  <option value="mais06">Superior a 06 Anos completos</option>
+                </select>
+                <input type="file" class="form-control" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png">
+              </div>
+              <div class="file-info">Anexe o documento comprobatório se desejar.</div>
+            </div>
+          `;
+        }
+      }
       
       // Envio do formulário
       form.addEventListener('submit', async function(e) {
@@ -536,8 +553,6 @@
           if (!formData.get('doc_identidade')) {
             throw new Error('Documento de identidade (RG/CNH) é obrigatório');
           }
-          
-          // Removida a validação que exigia o anexo do documento de tempo de exercício
           
           const response = await fetch('/api/inscricoes/create', {
             method: 'POST',
