@@ -5,8 +5,8 @@ const fs = require('fs');
 const router = express.Router();
 
 router.get('/:filename', (req, res) => {
-  // Usa process.cwd() para garantir que a pasta uploads seja procurada a partir da raiz do projeto
-  const uploadDir = path.join(process.cwd(), 'uploads');
+  // Usa a variável de ambiente UPLOADS_DIR se estiver definida; caso contrário, usa a pasta local "uploads" a partir do diretório de trabalho
+  const uploadDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
   const filePath = path.join(uploadDir, req.params.filename);
   
   console.log("Buscando arquivo em:", filePath); // Para depuração
