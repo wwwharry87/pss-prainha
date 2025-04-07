@@ -10,6 +10,10 @@
     .card { border-radius: 10px; }
     .card-title { color: #1a73e8; }
     input, select, textarea { text-transform: uppercase; }
+    .required-field::after {
+      content: " *";
+      color: red;
+    }
   </style>
 </head>
 <body>
@@ -20,25 +24,28 @@
         <form id="cadastroForm">
           <div class="row g-3">
             <div class="col-md-6">
-              <label for="cpf" class="form-label">CPF</label>
+              <label for="cpf" class="form-label required-field">CPF</label>
               <input type="text" class="form-control" id="cpf" name="cpf" required placeholder="DIGITE SOMENTE NÚMEROS" pattern="\d{11}">
             </div>
-            <div class="col-md-6">
-              <label for="rg" class="form-label">RG</label>
+            <div class="col-md-3">
+              <label for="rg" class="form-label required-field">RG</label>
               <input type="text" class="form-control" id="rg" name="rg" required>
             </div>
+            <div class="col-md-3">
+              <label for="orgao_expedidor" class="form-label required-field">ÓRGÃO EXPEDITOR</label>
+              <input type="text" class="form-control" id="orgao_expedidor" name="orgao_expedidor" required>
+            </div>
             <div class="col-12">
-              <label for="nome" class="form-label">NOME COMPLETO</label>
+              <label for="nome" class="form-label required-field">NOME COMPLETO</label>
               <input type="text" class="form-control" id="nome" name="nome" required>
             </div>
             <div class="col-md-6">
-              <label for="data_nascimento" class="form-label">DATA DE NASCIMENTO</label>
-              <!-- Input de texto com máscara de DD/MM/AAAA -->
+              <label for="data_nascimento" class="form-label required-field">DATA DE NASCIMENTO</label>
               <input type="text" class="form-control" id="data_nascimento" name="data_nascimento" required
                      placeholder="DD/MM/AAAA" pattern="^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$" maxlength="10">
             </div>
             <div class="col-md-6">
-              <label for="sexo" class="form-label">SEXO</label>
+              <label for="sexo" class="form-label required-field">SEXO</label>
               <select class="form-select" id="sexo" name="sexo" required>
                 <option value="">SELECIONE</option>
                 <option value="MASCULINO">MASCULINO</option>
@@ -47,36 +54,35 @@
               </select>
             </div>
             <div class="col-md-6">
-              <label for="email" class="form-label">E-MAIL</label>
+              <label for="email" class="form-label required-field">E-MAIL</label>
               <input type="email" class="form-control" id="email" name="email" required>
             </div>
             <div class="col-md-6">
-              <label for="celular" class="form-label">CELULAR</label>
-              <input type="tel" class="form-control" id="celular" name="celular" required>
+              <label for="celular" class="form-label required-field">CELULAR</label>
+              <input type="tel" class="form-control" id="celular" name="celular" required placeholder="(99) 99999-9999">
             </div>
             <div class="col-md-4">
-              <label for="cep" class="form-label">CEP</label>
-              <!-- Campo CEP ajustado para aceitar somente 8 dígitos -->
+              <label for="cep" class="form-label required-field">CEP</label>
               <input type="text" class="form-control" id="cep" name="cep" required maxlength="8" pattern="\d{8}" placeholder="CEP (8 dígitos)">
             </div>
             <div class="col-md-4">
-              <label for="estado" class="form-label">ESTADO</label>
+              <label for="estado" class="form-label required-field">ESTADO</label>
               <input type="text" class="form-control" id="estado" name="estado" required>
             </div>
             <div class="col-md-4">
-              <label for="municipio" class="form-label">MUNICÍPIO</label>
+              <label for="municipio" class="form-label required-field">MUNICÍPIO</label>
               <input type="text" class="form-control" id="municipio" name="municipio" required>
             </div>
             <div class="col-md-6">
-              <label for="logradouro" class="form-label">LOGRADOURO</label>
+              <label for="logradouro" class="form-label required-field">LOGRADOURO</label>
               <input type="text" class="form-control" id="logradouro" name="logradouro" required>
             </div>
             <div class="col-md-4">
-              <label for="bairro" class="form-label">BAIRRO</label>
+              <label for="bairro" class="form-label required-field">BAIRRO</label>
               <input type="text" class="form-control" id="bairro" name="bairro" required>
             </div>
             <div class="col-md-2">
-              <label for="numero" class="form-label">NÚMERO</label>
+              <label for="numero" class="form-label required-field">NÚMERO</label>
               <input type="text" class="form-control" id="numero" name="numero" required>
             </div>
             <div class="col-12">
@@ -84,20 +90,19 @@
               <input type="text" class="form-control" id="complemento" name="complemento">
             </div>
             <div class="col-md-6">
-              <label for="pcd" class="form-label">PESSOA COM DEFICIÊNCIA?</label>
+              <label for="pcd" class="form-label required-field">PESSOA COM DEFICIÊNCIA?</label>
               <select class="form-select" id="pcd" name="pcd" required>
                 <option value="false">NÃO</option>
                 <option value="true">SIM</option>
               </select>
             </div>
           </div>
-          <!-- Campo para upload do laudo -->
           <div class="mt-3" id="laudoDiv" style="display: none;">
-            <label for="laudo" class="form-label">ANEXAR LAUDO (PDF OU IMAGEM - ATÉ 2MB)</label>
+            <label for="laudo" class="form-label required-field">ANEXAR LAUDO (PDF OU IMAGEM - ATÉ 2MB)</label>
             <input type="file" class="form-control" id="laudo" name="laudo" accept=".pdf,image/*">
           </div>
           <div class="mt-3">
-            <label for="senha" class="form-label">SENHA</label>
+            <label for="senha" class="form-label required-field">CRIE A SUA SENHA</label>
             <input type="password" class="form-control" id="senha" name="senha" required>
           </div>
           <div class="mt-4">
@@ -109,13 +114,13 @@
     </div>
   </div>
 
-  <!-- Inclusão do jQuery e Inputmask para máscaras -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
   <script>
     $(document).ready(function(){
       $("#data_nascimento").inputmask("99/99/9999");
       $("#cep").inputmask("99999999");
+      $("#celular").inputmask("(99) 99999-9999");
     });
   </script>
 
@@ -195,6 +200,15 @@
       }
     });
 
+    // Validação do celular ao sair do campo
+    document.getElementById('celular').addEventListener('blur', function() {
+      const valor = this.value.replace(/\D/g, '');
+      if (valor.length !== 11) {
+        alert("Por favor, informe um número de celular válido com DDD (11 dígitos).");
+        this.focus();
+      }
+    });
+
     // Busca dados de endereço via CEP e trata Logradouro e Bairro
     document.getElementById('cep').addEventListener('blur', function() {
       const cep = this.value.replace(/\D/g, '');
@@ -205,7 +219,6 @@
           if (!data.erro) {
             document.getElementById('estado').value = data.uf;
             document.getElementById('municipio').value = data.localidade;
-            // Para logradouro e bairro, só bloqueia se o valor for retornado
             if(data.logradouro) {
               document.getElementById('logradouro').value = data.logradouro;
               document.getElementById('logradouro').readOnly = true;
@@ -218,11 +231,9 @@
             } else {
               document.getElementById('bairro').readOnly = false;
             }
-            // Estado e município sempre são preenchidos e bloqueados
             document.getElementById('estado').readOnly = true;
             document.getElementById('municipio').readOnly = true;
           } else {
-            // Caso CEP não seja encontrado, os campos ficam editáveis
             document.getElementById('estado').readOnly = false;
             document.getElementById('municipio').readOnly = false;
             document.getElementById('bairro').readOnly = false;
@@ -264,6 +275,13 @@
         return;
       }
       
+      // Validação do celular
+      const celular = document.getElementById('celular').value.replace(/\D/g, '');
+      if (celular.length !== 11) {
+        alert("Por favor, informe um número de celular válido com DDD (11 dígitos).");
+        return;
+      }
+      
       // Validação: se PCD for SIM, o laudo é obrigatório
       const pcdValue = document.getElementById('pcd').value;
       if (pcdValue === "true") {
@@ -280,8 +298,12 @@
       const formData = new FormData(form);
       // Remove a máscara do CPF
       formData.set('cpf', form.cpf.value.replace(/\D/g, ''));
+      // Remove a máscara do celular
+      formData.set('celular', celular);
       // Converte a data de nascimento para ISO (YYYY-MM-DD)
       formData.set('data_nascimento', parsedDate.toISOString().split('T')[0]);
+      // Converte o nome para maiúsculas
+      formData.set('nome', form.nome.value.toUpperCase());
       
       try {
         const response = await fetch('/api/candidatos/create', {

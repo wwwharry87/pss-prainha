@@ -51,7 +51,7 @@ const handleUploadCandidatos = (req, res, next) => {
   });
 };
 
-// Middleware para inscrições: campos de documentos, limite global 5MB
+// Middleware para inscrições: agora incluindo todos os campos que o formulário pode enviar, limite global 5MB
 const uploadInscricoes = multer({
   storage: storage,
   fileFilter: fileFilter,
@@ -64,7 +64,18 @@ const uploadInscricoes = multer({
   { name: 'doc_especializacao', maxCount: 1 },
   { name: 'doc_mestrado', maxCount: 1 },
   { name: 'doc_doutorado', maxCount: 1 },
-  { name: 'doc_plano_aula', maxCount: 1 }
+  { name: 'doc_plano_aula', maxCount: 1 },
+  { name: 'doc_certificado', maxCount: 1 },
+  { name: 'doc_certificado_fundamental', maxCount: 1 },
+  { name: 'doc_certificado_medio', maxCount: 1 },
+  { name: 'doc_certificado_fund_completo', maxCount: 1 },
+  { name: 'doc_cursos', maxCount: 4 },
+  { name: 'doc_pos', maxCount: 2 },
+  { name: 'doc_qualificacao', maxCount: 2 },
+  { name: 'doc_tempo_exercicio', maxCount: 1 },
+  // Campos extras que estavam sendo enviados pelo formulário
+  { name: 'doc_experiencia', maxCount: 1 },
+  { name: 'doc_outros', maxCount: 1 }
 ]);
 
 const handleUploadInscricoes = (req, res, next) => {

@@ -14,11 +14,12 @@
     body { background-color: #f8f9fa; }
     .card-inscricao { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .text-uppercase { text-transform: uppercase; }
+    .icon-btn { cursor: pointer; color: #0d6efd; margin-left: 5px; }
   </style>
 </head>
 <body>
   <div class="container my-5">
-    <!-- Botão de Logout com ícone e texto "Sair" -->
+    <!-- Botão de Logout -->
     <div class="d-flex justify-content-end mb-3">
       <a href="index.html" class="btn btn-danger">
         <i class="bi bi-box-arrow-right"></i> Sair
@@ -42,13 +43,27 @@
     <div id="inscricoes" class="row g-3"></div>
   </div>
   
+  <!-- Modal de Visualização de Anexo -->
+  <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="previewModalLabel">Visualização de Anexo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <iframe id="previewFrame" src="" style="width: 100%; height: 80vh;" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <script>
-    // Variáveis globais para armazenar dados do candidato e inscrições
     let globalCandidato = null;
     let globalInscricoes = [];
     let brasaoBase64 = null;  // Para armazenar o brasão em Base64
 
-    // Função para carregar a imagem do brasão e converter para Base64
+    // Função para carregar uma imagem e convertê-la para Base64
     async function carregarImagemParaBase64(url) {
       try {
         const response = await fetch(url);
@@ -65,7 +80,7 @@
       }
     }
 
-    // Carrega a imagem do brasão (certifique-se de que 'brasao.jpg' esteja na pasta frontend)
+    // Carrega a imagem do brasão (garanta que 'brasao.jpg' esteja acessível)
     carregarImagemParaBase64('brasao.jpg')
       .then(base64 => { brasaoBase64 = base64; })
       .catch(err => { console.error("Erro ao converter imagem:", err); brasaoBase64 = ""; });
@@ -75,12 +90,11 @@
       return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     }
 
-    // Obtém o CPF (ou token) da URL
+    // Obtém o token ou CPF da URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const cpfParam = urlParams.get('cpf');
 
-    // Carrega os dados do candidato e inscrições
     async function carregarDados() {
       document.getElementById('loading').classList.remove('d-none');
       let url = "";
@@ -115,7 +129,6 @@
       }
     }
 
-    // Exibe os dados do candidato com botões de nova inscrição e imprimir
     function exibirDadosCandidato(candidato) {
       const container = document.getElementById('dadosCandidato');
       container.innerHTML = `
@@ -124,7 +137,7 @@
             <h5 class="card-title text-uppercase">${candidato.nome}</h5>
             <p class="card-text"><strong>CPF:</strong> ${formatarCPF(candidato.cpf)}</p>
             <p class="card-text"><strong>E-MAIL:</strong> ${candidato.email}</p>
-            ${candidato.pcd ? `<p class="card-text"><strong>LAUDO:</strong> ${candidato.laudo ? candidato.laudo : 'NÃO ANEXADO'}</p>` : ''}
+            ${candidato.pcd ? `<p class="card-text"><strong>LAUDO:</strong> ${candidato.laudo ? `PcD <i class="bi bi-eye-fill icon-btn" onclick="visualizarArquivo('${candidato.laudo}')"></i>` : 'NÃO ANEXADO'}</p>` : ''}
             <div class="d-flex gap-2 mt-3">
               <button class="btn btn-primary btn-sm" onclick="window.location.href='/inscricao.html?${token ? 'token' : 'cpf'}=${encodeURIComponent(token || candidato.cpf)}'">NOVA INSCRIÇÃO</button>
               <button class="btn btn-secondary btn-sm" onclick="imprimirTodas()">IMPRIMIR TODAS</button>
@@ -134,7 +147,47 @@
       `;
     }
 
-    // Exibe as inscrições em cartões
+    // Função para montar a lista de documentos anexados de uma inscrição
+    function montarListaDocumentos(insc) {
+      const docs = [];
+      if (insc.doc_identidade_path) docs.push({ label: "RG ou CNH", filename: insc.doc_identidade_path });
+      if (insc.doc_escolaridade_path) docs.push({ label: "Comprovante de Escolaridade", filename: insc.doc_escolaridade_path });
+      if (insc.doc_diploma_path) docs.push({ label: "Diploma de Graduação", filename: insc.doc_diploma_path });
+      if (insc.doc_especifico_path) docs.push({ label: "Documento Adicional", filename: insc.doc_especifico_path });
+      if (insc.doc_especializacao_path) docs.push({ label: "Diploma de Especialização", filename: insc.doc_especializacao_path });
+      if (insc.doc_mestrado_path) docs.push({ label: "Diploma de Mestrado", filename: insc.doc_mestrado_path });
+      if (insc.doc_doutorado_path) docs.push({ label: "Diploma de Doutorado", filename: insc.doc_doutorado_path });
+      if (insc.doc_plano_aula_path) docs.push({ label: "Plano de Aula", filename: insc.doc_plano_aula_path });
+      if (insc.doc_cursos) {
+        try {
+          const cursos = JSON.parse(insc.doc_cursos);
+          cursos.forEach((fn, i) => {
+            docs.push({ label: `Curso Complementar ${i+1}`, filename: fn });
+          });
+        } catch (e) { console.error(e); }
+      }
+      if (insc.doc_pos) {
+        try {
+          const pos = JSON.parse(insc.doc_pos);
+          pos.forEach((fn, i) => {
+            docs.push({ label: `Pós/Especialização ${i+1}`, filename: fn });
+          });
+        } catch (e) { console.error(e); }
+      }
+      if (insc.doc_qualificacao) {
+        try {
+          const qual = JSON.parse(insc.doc_qualificacao);
+          qual.forEach((fn, i) => {
+            docs.push({ label: `Qualificação ${i+1}`, filename: fn });
+          });
+        } catch (e) { console.error(e); }
+      }
+      if (insc.doc_tempo_exercicio_path) {
+        docs.push({ label: "Comprovante de Tempo de Exercício", filename: insc.doc_tempo_exercicio_path });
+      }
+      return docs;
+    }
+
     function exibirInscricoes(inscricoes) {
       const container = document.getElementById('inscricoes');
       container.innerHTML = '';
@@ -152,24 +205,14 @@
           dataInscricao = dt.toLocaleString('pt-BR');
         }
         
-        // Prepara a lista de anexos com base nos documentos enviados
-        let anexos = [];
-        if (insc.doc_identidade_path) anexos.push("RG ou CNH");
-        if (insc.doc_escolaridade_path) anexos.push("Comprovante de Escolaridade");
-        if (insc.doc_diploma_path) anexos.push("Diploma de Graduação");
-        if (insc.doc_especifico_path) anexos.push("Documento Adicional");
-        if (insc.doc_especializacao_path) anexos.push("Diploma de Especialização");
-        if (insc.doc_mestrado_path) anexos.push("Diploma de Mestrado");
-        if (insc.doc_doutorado_path) anexos.push("Diploma de Doutorado");
-        if (insc.doc_plano_aula_path) anexos.push("Plano de Aula");
-        
-        let anexosHTML = '';
-        if (anexos.length > 0) {
-          anexosHTML = `<p><strong>Anexo(s):</strong></p><ul>`;
-          anexos.forEach(item => {
-            anexosHTML += `<li>${item}</li>`;
+        const documentos = montarListaDocumentos(insc);
+        let docsHTML = '';
+        if (documentos.length > 0) {
+          docsHTML += `<p><strong>Documentos Anexados:</strong></p><ul>`;
+          documentos.forEach(doc => {
+            docsHTML += `<li>${doc.label} <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i></li>`;
           });
-          anexosHTML += `</ul>`;
+          docsHTML += `</ul>`;
         }
         
         const div = document.createElement('div');
@@ -180,10 +223,10 @@
               <h5 class="card-title text-center" style="color: black;">${index + 1}ª INSCRIÇÃO</h5>
               <p class="card-text text-left" style="color: blue;"><strong>${cargoCompleto}</strong></p>
               <p class="card-text"><strong>ZONA:</strong> ${insc.zona}</p>
-              <p class="card-text"><strong>TEMPO DE SERVIÇO:</strong> ${insc.tempo_servico} ANOS</p>
+              <p class="card-text"><strong>TEMPO DE EXERCÍCIO:</strong> ${insc.tempo_exercicio || '0'} ANOS</p>
               <p class="card-text"><strong>DATA DA INSCRIÇÃO:</strong> ${dataInscricao}</p>
               ${insc.plan_aula ? `<p class="card-text"><strong>PLANO DE AULA:</strong> ${insc.plan_aula}</p>` : ''}
-              ${anexosHTML}
+              ${docsHTML}
               <div class="d-flex gap-2">
                 <button class="btn btn-danger btn-sm" onclick="excluirInscricao(${insc.id})">EXCLUIR</button>
               </div>
@@ -194,7 +237,6 @@
       });
     }
 
-    // Função para excluir inscrição individual
     async function excluirInscricao(inscricaoId) {
       if (!confirm('Tem certeza que deseja excluir esta inscrição?')) return;
       try {
@@ -208,7 +250,14 @@
       }
     }
 
-    // Função para gerar PDF de todas as inscrições, incluindo a lista de anexos
+    // Função para abrir o modal de visualização do arquivo
+    function visualizarArquivo(filename) {
+      const previewFrame = document.getElementById('previewFrame');
+      previewFrame.src = `/download/${filename}?preview=true`;
+      const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+      modal.show();
+    }
+
     function imprimirTodas() {
       if (!globalInscricoes || globalInscricoes.length === 0) {
         alert('Nenhuma inscrição para imprimir.');
@@ -217,6 +266,60 @@
       if (!brasaoBase64) {
         alert('Imagem do brasão não carregada. Tente novamente.');
         return;
+      }
+      
+      // Mapeamento para texto amigável do tempo de exercício
+      const tempoMap = {
+        "ate02": "até 2 anos",
+        "de02a04": "2 a 4 anos",
+        "de04a06": "4 a 6 anos",
+        "mais06": "Mais de 6 anos"
+      };
+
+      // Função auxiliar para obter o texto do tempo
+      function formatarTempo(tempo) {
+        return tempoMap[tempo] || tempo || "0";
+      }
+      
+      // Utilize a mesma função montarListaDocumentos para obter os anexos
+      function montarListaDocumentos(insc) {
+        const docs = [];
+        if (insc.doc_identidade_path) docs.push("RG ou CNH");
+        if (insc.doc_escolaridade_path) docs.push("Comprovante de Escolaridade");
+        if (insc.doc_diploma_path) docs.push("Diploma de Graduação");
+        if (insc.doc_especifico_path) docs.push("Documento Adicional");
+        if (insc.doc_especializacao_path) docs.push("Diploma de Especialização");
+        if (insc.doc_mestrado_path) docs.push("Diploma de Mestrado");
+        if (insc.doc_doutorado_path) docs.push("Diploma de Doutorado");
+        if (insc.doc_plano_aula_path) docs.push("Plano de Aula");
+        if (insc.doc_cursos) {
+          try {
+            const cursos = JSON.parse(insc.doc_cursos);
+            cursos.forEach((fn, i) => {
+              docs.push(`Curso Complementar ${i+1}`);
+            });
+          } catch (e) { console.error(e); }
+        }
+        if (insc.doc_pos) {
+          try {
+            const pos = JSON.parse(insc.doc_pos);
+            pos.forEach((fn, i) => {
+              docs.push(`Pós/Especialização ${i+1}`);
+            });
+          } catch (e) { console.error(e); }
+        }
+        if (insc.doc_qualificacao) {
+          try {
+            const qual = JSON.parse(insc.doc_qualificacao);
+            qual.forEach((fn, i) => {
+              docs.push(`Qualificação ${i+1}`);
+            });
+          } catch (e) { console.error(e); }
+        }
+        if (insc.doc_tempo_exercicio_path) {
+          docs.push("Comprovante de Tempo de Exercício");
+        }
+        return docs;
       }
       
       const content = [
@@ -238,16 +341,7 @@
           dataInscricao = dt.toLocaleString('pt-BR');
         }
         
-        // Lista de anexos
-        let anexos = [];
-        if (insc.doc_identidade_path) anexos.push("RG ou CNH");
-        if (insc.doc_escolaridade_path) anexos.push("Comprovante de Escolaridade");
-        if (insc.doc_diploma_path) anexos.push("Diploma de Graduação");
-        if (insc.doc_especifico_path) anexos.push("Documento Adicional");
-        if (insc.doc_especializacao_path) anexos.push("Diploma de Especialização");
-        if (insc.doc_mestrado_path) anexos.push("Diploma de Mestrado");
-        if (insc.doc_doutorado_path) anexos.push("Diploma de Doutorado");
-        if (insc.doc_plano_aula_path) anexos.push("Plano de Aula");
+        const docs = montarListaDocumentos(insc);
         
         content.push(
           { text: `${index + 1}ª INSCRIÇÃO`, style: 'inscHeader', alignment: 'center', color: 'black' },
@@ -269,8 +363,8 @@
                   { text: insc.zona, style: 'tableData', alignment: 'left' }
                 ],
                 [
-                  { text: 'Tempo de Serviço:', style: 'tableHeader', alignment: 'left' },
-                  { text: `${insc.tempo_servico} ANOS`, style: 'tableData', alignment: 'left' }
+                  { text: 'Tempo de Exercício:', style: 'tableHeader', alignment: 'left' },
+                  { text: formatarTempo(insc.tempo_exercicio), style: 'tableData', alignment: 'left' }
                 ]
               ]
             },
@@ -278,11 +372,10 @@
           }
         );
         
-        // Se houver anexos, adiciona a lista
-        if (anexos.length > 0) {
+        if (docs.length > 0) {
           content.push(
-            { text: 'ANEXO(S):', style: 'tableHeader', margin: [0, 5, 0, 2] },
-            { ul: anexos, style: 'tableData' }
+            { text: 'Anexo(s):', style: 'tableHeader', margin: [0, 5, 0, 2] },
+            { ul: docs, style: 'tableData' }
           );
         }
         
@@ -310,8 +403,7 @@
       
       pdfMake.createPdf(docDefinition).open();
     }
-    
-    // Carrega os dados ao carregar a página
+
     carregarDados();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

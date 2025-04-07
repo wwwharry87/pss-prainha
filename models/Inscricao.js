@@ -9,9 +9,9 @@ const Inscricao = sequelize.define('Inscricao', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  tempo_servico: {
-    type: DataTypes.INTEGER,
-    allowNull: false
+  // Campo para armazenar o valor selecionado no tempo de exercício
+  tempo_exercicio: {
+    type: DataTypes.STRING
   },
   plan_aula: {
     type: DataTypes.TEXT
@@ -43,6 +43,34 @@ const Inscricao = sequelize.define('Inscricao', {
     type: DataTypes.STRING
   },
   doc_plano_aula_path: {
+    type: DataTypes.STRING
+  },
+  // Novos campos para certificados e cursos
+  doc_certificado_path: {
+    type: DataTypes.STRING
+  },
+  doc_certificado_fundamental_path: {
+    type: DataTypes.STRING
+  },
+  doc_certificado_medio_path: {
+    type: DataTypes.STRING
+  },
+  doc_certificado_fund_completo_path: {
+    type: DataTypes.STRING
+  },
+  // Para cursos complementares, armazenamos os nomes dos arquivos em formato JSON
+  doc_cursos: {
+    type: DataTypes.TEXT
+  },
+  // Campos específicos para Nível Superior
+  doc_pos: {
+    type: DataTypes.TEXT
+  },
+  doc_qualificacao: {
+    type: DataTypes.TEXT
+  },
+  // Para o tempo de exercício, armazenamos também o arquivo comprobatório
+  doc_tempo_exercicio_path: {
     type: DataTypes.STRING
   }
 }, {

@@ -8,20 +8,13 @@
   <style>
     body { background-color: #f8f9fa; }
     .card { border-radius: 10px; }
-    .document-section { 
+    .section-title { 
       border-left: 4px solid #0d6efd;
-      padding-left: 1rem;
-      margin-bottom: 1.5rem;
+      padding-left: 10px;
+      margin: 20px 0 15px;
+      font-weight: bold;
     }
-    .required-badge { background-color: #dc3545; }
-    .optional-badge { background-color: #6c757d; }
-    .requisito-cargo {
-      background-color: #e9ecef;
-      padding: 0.75rem;
-      border-radius: 5px;
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-    }
+    .required-field::after { content: " *"; color: #dc3545; }
     .loading-spinner {
       display: none;
       width: 2rem;
@@ -36,6 +29,11 @@
       color: #6c757d;
       margin-top: 0.25rem;
     }
+    .add-btn {
+      cursor: pointer;
+      color: #0d6efd;
+      margin-left: 5px;
+    }
     @keyframes spinner-border {
       to { transform: rotate(360deg); }
     }
@@ -48,145 +46,166 @@
         <h2 class="card-title text-center mb-4">INSCRIÇÃO PSS</h2>
         
         <form id="inscricaoForm" enctype="multipart/form-data">
+          <!-- Campo oculto para CPF -->
           <input type="hidden" id="cpf" name="cpf">
           
-          <!-- Seção Zona -->
+          <!-- Seção 1: Dados Básicos -->
           <div class="mb-4">
-            <h5 class="mb-3">1. SELECIONE A ZONA</h5>
-            <select class="form-select" id="zona" name="zona" required>
-              <option value="">SELECIONE A ZONA</option>
-              <option value="RURAL/ITAMUCURI">RURAL/ITAMUCURI</option>
-              <option value="RURAL/IPANEMA">RURAL/IPANEMA</option>
-              <option value="URBANA/SEDE">URBANA/SEDE</option>
-              <option value="RURAL/SANTA MARIA DO URUARÁ">RURAL/SANTA MARIA DO URUARÁ</option>
-              <option value="RURAL/PACOVAL">RURAL/PACOVAL</option>
-              <option value="RURAL/COLÔNIA DE CIMA">RURAL/COLÔNIA DE CIMA</option>
-              <option value="RURAL/GUAJARÁ">RURAL/GUAJARÁ</option>
-              <option value="RURAL/BOA VISTA DO CUÇARI">RURAL/BOA VISTA DO CUÇARI</option>
-              <option value="RURAL/TAMUATAÍ">RURAL/TAMUATAÍ</option>
-              <option value="RURAL/COLÔNIA DE BAIXO">RURAL/COLÔNIA DE BAIXO</option>
-              <option value="RURAL/RIBEIRINHA">RURAL/RIBEIRINHA</option>
-            </select>
-          </div>
-
-          <!-- Seção Cargo -->
-          <div class="mb-4">
-            <h5 class="mb-3">2. SELECIONE O CARGO</h5>
-            <select class="form-select" id="cargo" name="cargo_id" required disabled>
-              <option value="">SELECIONE A ZONA PRIMEIRO</option>
-            </select>
-            <div id="requisitosCargo" class="requisito-cargo mt-2" style="display: none;"></div>
-            <div id="loadingCargos" class="mt-2 text-center">
-              <div class="loading-spinner text-primary"></div>
-              <span>Carregando cargos...</span>
+            <h5 class="section-title">1. SELECIONE A ZONA</h5>
+            <div class="mb-3">
+              <label for="zona" class="form-label required-field">Zona</label>
+              <select class="form-select" id="zona" name="zona" required>
+                <option value="">SELECIONE A ZONA</option>
+                <option value="RURAL/ITAMUCURI">RURAL/ITAMUCURI</option>
+                <option value="RURAL/IPANEMA">RURAL/IPANEMA</option>
+                <option value="URBANA/SEDE">URBANA/SEDE</option>
+                <option value="RURAL/SANTA MARIA DO URUARÁ">RURAL/SANTA MARIA DO URUARÁ</option>
+                <option value="RURAL/PACOVAL">RURAL/PACOVAL</option>
+                <option value="RURAL/COLÔNIA DE CIMA">RURAL/COLÔNIA DE CIMA</option>
+                <option value="RURAL/GUAJARÁ">RURAL/GUAJARÁ</option>
+                <option value="RURAL/BOA VISTA DO CUÇARI">RURAL/BOA VISTA DO CUÇARI</option>
+                <option value="RURAL/TAMUATAÍ">RURAL/TAMUATAÍ</option>
+                <option value="RURAL/COLÔNIA DE BAIXO">RURAL/COLÔNIA DE BAIXO</option>
+                <option value="RURAL/RIBEIRINHA">RURAL/RIBEIRINHA</option>
+              </select>
             </div>
-          </div>
-
-          <!-- Campo Tempo de Serviço e Comprovação de CTPS -->
-          <div class="mb-4">
-            <h5 class="mb-3">TEMPO DE SERVIÇO</h5>
-            <div class="row">
-              <div class="col-md-6">
-                <label for="tempo_servico" class="form-label">Anos de experiência na área</label>
-                <input type="number" class="form-control" id="tempo_servico" name="tempo_servico" min="0" max="50" required>
-              </div>
-              <div class="col-md-6" id="ctpsField" style="display: none;">
-                <label for="doc_experiencia" class="form-label">COMPROVAÇÃO DE TEMPO DE EXERCÍCIO (CTPS)</label>
-                <input type="file" class="form-control" id="doc_experiencia" name="doc_experiencia" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB). (Máximo 1 comprovação)</div>
+            <div class="mb-3">
+              <label for="cargo" class="form-label required-field">Cargo</label>
+              <select class="form-select" id="cargo" name="cargo_id" required disabled>
+                <option value="">SELECIONE A ZONA PRIMEIRO</option>
+              </select>
+              <div id="requisitosCargo" class="requisito-cargo mt-2" style="display: none;"></div>
+              <div id="loadingCargos" class="mt-2 text-center">
+                <div class="loading-spinner text-primary"></div>
+                <span>Carregando cargos...</span>
               </div>
             </div>
           </div>
-
-          <!-- Seção Documentos Obrigatórios -->
-          <div id="documentosSection" style="display: none;">
-            <h5 class="mb-3">3. ANEXE OS DOCUMENTOS OBRIGATÓRIOS</h5>
+          
+          <!-- Seção 2: Documentos Obrigatórios -->
+          <div class="mb-4" id="documentosSection">
+            <h5 class="section-title">2. DOCUMENTOS OBRIGATÓRIOS</h5>
             <div class="document-section">
               <div class="mb-3">
-                <label class="form-label">RG OU CNH</label>
+                <label class="form-label required-field">Documento de Identidade (RG ou CNH)</label>
                 <input type="file" class="form-control" name="doc_identidade" accept=".pdf,.jpg,.png" required>
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                <div class="file-info">PDF, JPG, PNG</div>
               </div>
-              
-              <!-- Comprovante de Escolaridade: obrigatório se o cargo NÃO for FUNDAMENTAL INCOMPLETO -->
-              <div id="docEscolaridade" class="mb-3" style="display: block;">
-                <label class="form-label" id="labelEscolaridade">COMPROVANTE DE ESCOLARIDADE</label>
-                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+              <!-- Alterado para REQUISITOS MÍNIMOS DO CARGO (Comprovante de Escolaridade) -->
+              <div class="mb-3" id="docEscolaridade">
+                <label class="form-label" id="labelEscolaridade">REQUISITOS MÍNIMOS DO CARGO (Comprovante de Escolaridade)</label>
+                <input type="file" class="form-control" name="doc_escolaridade" accept=".pdf,.jpg,.png" required>
+                <div class="file-info">PDF, JPG, PNG</div>
               </div>
-              
-              <!-- Diploma de Graduação: obrigatório para cargos de nível superior -->
-              <div id="docDiploma" class="mb-3" style="display: none;">
-                <label class="form-label" id="labelDiploma">DIPLOMA DE GRADUAÇÃO</label>
-                <input type="file" class="form-control" name="doc_diploma" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+              <!-- Para cargos de Nível Superior, o campo "Diploma de Graduação" é substituído por "Plano de Aula" -->
+              <div class="mb-3" id="docDiploma" style="display: none;">
+                <label class="form-label required-field" id="labelDiploma">Plano de Aula</label>
+                <input type="file" class="form-control" name="doc_plano_aula" accept=".pdf,.jpg,.png">
+                <div class="file-info">PDF</div>
               </div>
-              
-              <!-- Documento Adicional (ex: para Motorista) -->
-              <div id="docEspecifico" class="mb-3" style="display: none;">
-                <label class="form-label" id="labelDocEspecifico">DOCUMENTO ADICIONAL</label>
+              <div class="mb-3" id="docEspecifico" style="display: none;">
+                <label class="form-label" id="labelDocEspecifico">Documento Adicional</label>
                 <input type="file" class="form-control" name="doc_especifico" accept=".pdf,.jpg,.png">
-                <div class="file-info">Formatos: PDF, JPG, PNG (máximo 2MB)</div>
+                <div class="file-info">PDF, JPG, PNG</div>
               </div>
             </div>
           </div>
-
-          <!-- Seção Documentos para Pontuação (Critérios de Avaliação) -->
-          <div id="criteriosSection" style="display: none;">
-            <h5 class="mb-3">4. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
+          
+          <!-- Seção 3: Documentos para Pontuação (Opcional) -->
+          <div class="mb-4" id="criteriosSection" style="display: none;">
+            <h5 class="section-title">3. DOCUMENTOS PARA PONTUAÇÃO (OPCIONAL)</h5>
             <div class="document-section">
-              <!-- Certificado de Conclusão com seleção de tipo -->
-              <div class="mb-3">
-                <label class="form-label">CERTIFICADO DE CONCLUSÃO</label>
+              <!-- Grupos de Certificados (para níveis que não sejam Superior) -->
+              <div id="certificadoDefaultGroup" style="display: none;">
+                <label class="form-label">Certificado de Conclusão</label>
                 <div class="input-group">
-                  <select class="form-select" id="tipoCertificado" name="tipo_certificado">
-                    <option value="">Selecione o tipo</option>
-                    <option value="FUNDAMENTAL/EJA">FUNDAMENTAL/EJA</option>
-                    <option value="MÉDIO/EJA">MÉDIO/EJA</option>
-                    <option value="SUPERIOR">SUPERIOR</option>
-                  </select>
                   <input type="file" class="form-control" name="doc_certificado" accept=".pdf,.jpg,.png">
                 </div>
-                <div class="file-info">Envie 1 arquivo referente ao certificado de conclusão.</div>
+                <div class="file-info">Envie 1 arquivo referente ao certificado.</div>
               </div>
-              <!-- Cursos Complementares (permite múltiplos arquivos, até 2) -->
-              <div class="mb-3">
-                <label class="form-label">CURSOS COMPLEMENTARES</label>
-                <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png" multiple>
-                <div class="file-info">Envie até 2 arquivos.</div>
+              <div id="certificadoFundamentalGroup" style="display: none;">
+                <label class="form-label">Certificado de Conclusão do Nível Fundamental</label>
+                <input type="file" class="form-control" name="doc_certificado_fundamental" accept=".pdf,.jpg,.png">
+                <div class="file-info">Envie 1 arquivo referente ao certificado do nível fundamental.</div>
               </div>
-              <!-- Demais documentos opcionais -->
-              <div class="mb-3">
-                <label class="form-label">OUTROS DOCUMENTOS PARA PONTUAÇÃO</label>
-                <input type="file" class="form-control" name="doc_outros" accept=".pdf,.jpg,.png" multiple>
-                <div class="file-info">Envie os documentos adicionais conforme os critérios (limite conforme edital).</div>
+              <div id="certificadoMedioGroup" style="display: none;">
+                <label class="form-label">Certificado de Conclusão do Ensino Médio</label>
+                <input type="file" class="form-control" name="doc_certificado_medio" accept=".pdf,.jpg,.png">
+                <div class="file-info">Envie 1 arquivo referente ao certificado do ensino médio.</div>
               </div>
+              <div id="certificadoFundCompletoGroup" style="display: none;">
+                <label class="form-label">Certificado de Conclusão do Nível Médio ou Cursando</label>
+                <input type="file" class="form-control" name="doc_certificado_fund_completo" accept=".pdf,.jpg,.png">
+                <div class="file-info">Envie 1 arquivo referente ao certificado do nível médio ou cursando.</div>
+              </div>
+              
+              <!-- Cursos Complementares (para níveis que não sejam Superior) -->
+              <div class="mb-3" id="cursosComplementaresGroup">
+                <label class="form-label">Cursos Complementares</label>
+                <div id="cursosContainer"></div>
+                <div class="file-info">Cada curso deve comprovar o mínimo de horas necessárias.</div>
+              </div>
+              
+              <!-- Campo Tempo de Exercício -->
+              <div class="mb-3" id="tempoExercicioGroup">
+                <label class="form-label">Tempo de Exercício na Atividade Profissional</label>
+                <div class="input-group">
+                  <select class="form-select" id="tempo_exercicio_select" name="tempo_exercicio_select">
+                    <option value="">Selecione a opção</option>
+                    <option value="ate02">Até 02 Anos completos</option>
+                    <option value="de02a04">De 02 Anos e 01 dia até 04 Anos completos</option>
+                    <option value="de04a06">De 04 Anos e 01 dia até 06 Anos completos</option>
+                    <option value="mais06">Superior a 06 Anos completos</option>
+                  </select>
+                  <input type="file" class="form-control" id="doc_tempo_exercicio" name="doc_tempo_exercicio" accept=".pdf,.jpg,.png" style="display: none;">
+                </div>
+                <div class="file-info">Anexe o documento comprobatório se desejar.</div>
+              </div>
+              
               <!-- Campos adicionais para cargos de Nível Superior -->
               <div id="superiorFields" style="display: none;">
                 <div class="mb-3">
-                  <label class="form-label">PÓS GRADUAÇÃO/ESPECIALIZAÇÃO</label>
-                  <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png" multiple>
-                  <div class="file-info">Envie até 2 arquivos.</div>
+                  <label class="form-label">Pós-graduação/Especializações</label>
+                  <div>
+                    <!-- Removido os colchetes dos nomes -->
+                    <input type="file" class="form-control mb-2" name="doc_pos" accept=".pdf,.jpg,.png">
+                    <input type="file" class="form-control" name="doc_pos" accept=".pdf,.jpg,.png">
+                  </div>
+                  <div class="file-info">PDF, JPG, PNG</div>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">CURSO DE QUALIFICAÇÃO</label>
-                  <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png" multiple>
-                  <div class="file-info">Envie até 2 arquivos.</div>
+                  <label class="form-label">Mestrado</label>
+                  <input type="file" class="form-control" name="doc_mestrado" accept=".pdf,.jpg,.png">
+                  <div class="file-info">Envie 1 arquivo referente ao Mestrado.</div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Doutorado</label>
+                  <input type="file" class="form-control" name="doc_doutorado" accept=".pdf,.jpg,.png">
+                  <div class="file-info">Envie 1 arquivo referente ao Doutorado.</div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Curso de Qualificação/APERFEIÇOAMENTO PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE</label>
+                  <div>
+                    <!-- Removido os colchetes -->
+                    <input type="file" class="form-control mb-2" name="doc_qualificacao" accept=".pdf,.jpg,.png">
+                    <input type="file" class="form-control" name="doc_qualificacao" accept=".pdf,.jpg,.png">
+                  </div>
+                  <div class="file-info">Envie 2 arquivos referentes ao curso de qualificação.</div>
                 </div>
               </div>
             </div>
           </div>
-
-          <!-- Confirmação -->
+          
+          <!-- Seção 4: Confirmação -->
           <div class="mb-4">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="declaracao" required>
               <label class="form-check-label" for="declaracao">
-                Declaro que todas as informações são verdadeiras e documentos são válidos.
+                Declaro que todas as informações são verdadeiras e os documentos anexados são válidos.
               </label>
             </div>
           </div>
-
+          
           <button type="submit" class="btn btn-primary w-100 py-3">
             <span id="submitText">CONCLUIR INSCRIÇÃO</span>
             <div id="submitSpinner" class="loading-spinner d-none"></div>
@@ -196,243 +215,357 @@
       </div>
     </div>
   </div>
-
-  <!-- Inclusão do jQuery e Inputmask para máscaras -->
+  
+  <!-- Inclusão do jQuery e Inputmask -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
   <script>
-    $(document).ready(function(){
-      $("#cep").inputmask("99999999");
-      $("#data_nascimento").inputmask("99/99/9999");
-    });
-  </script>
-
-  <script>
-    // Captura o CPF da URL
-    const urlParams = new URLSearchParams(window.location.search);
-    document.getElementById('cpf').value = urlParams.get('cpf') || '';
-
-    // Elementos do DOM
-    const zonaSelect = document.getElementById('zona');
-    const cargoSelect = document.getElementById('cargo');
-    const requisitosDiv = document.getElementById('requisitosCargo');
-    const loadingCargos = document.getElementById('loadingCargos');
-    const documentosSection = document.getElementById('documentosSection');
-    const criteriosSection = document.getElementById('criteriosSection');
-    const form = document.getElementById('inscricaoForm');
-    const ctpsField = document.getElementById('ctpsField');
-    const tempoInput = document.getElementById('tempo_servico');
-
-    // Mapeamento dos valores do dropdown para os valores armazenados no banco
-    const zoneMapping = {
-      "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
-      "RURAL/IPANEMA": "RURAL/IPANEMA",
-      "URBANA/SEDE": "URBANA/SEDE",
-      "RURAL/SANTA MARIA DO URUARÁ": "RURAL/SANTA MARIA DO URUARÁ",
-      "RURAL/PACOVAL": "RURAL/PACOVAL",
-      "RURAL/COLÔNIA DE CIMA": "RURAL/COLÔNIA DE CIMA",
-      "RURAL/GUAJARÁ": "RURAL/GUAJARÁ",
-      "RURAL/BOA VISTA DO CUÇARI": "RURAL/BOA VISTA DO CUÇARI",
-      "RURAL/TAMUATAÍ": "RURAL/TAMUATAÍ",
-      "RURAL/COLÔNIA DE BAIXO": "RURAL/COLÔNIA DE BAIXO",
-      "RURAL/RIBEIRINHA": "RURAL/RIBEIRINHA"
-    };
-
-    // Verifica o campo TEMPO DE SERVIÇO e exibe/oculta a comprovação de CTPS
-    tempoInput.addEventListener('change', function() {
-      const tempo = parseFloat(this.value);
-      if (tempo > 0) {
-        ctpsField.style.display = 'block';
-        document.getElementById('doc_experiencia').required = true;
-      } else {
-        ctpsField.style.display = 'none';
-        document.getElementById('doc_experiencia').required = false;
-      }
-    });
-
-    // Busca cargos quando seleciona zona
-    zonaSelect.addEventListener('change', async function() {
-      const zona = this.value;
-      const mappedZona = zoneMapping[zona] || zona;
+    document.addEventListener("DOMContentLoaded", function() {
       
-      if (!mappedZona) {
-        cargoSelect.innerHTML = '<option value="">SELECIONE A ZONA PRIMEIRO</option>';
-        cargoSelect.disabled = true;
-        documentosSection.style.display = 'none';
-        criteriosSection.style.display = 'none';
-        return;
-      }
-      
-      cargoSelect.innerHTML = '<option value="">CARREGANDO...</option>';
-      cargoSelect.disabled = true;
-      loadingCargos.style.display = 'block';
-      
-      try {
-        const response = await fetch(`/api/cargos?zona=${encodeURIComponent(mappedZona)}`);
-        if (!response.ok) throw new Error('Erro ao carregar cargos');
-        
-        const result = await response.json();
-        if (!result.success || !Array.isArray(result.data)) {
-          throw new Error('Resposta inválida da API');
-        }
-        
-        if (result.data.length === 0) {
-          cargoSelect.innerHTML = '<option value="">NENHUM CARGO DISPONÍVEL</option>';
+      // Função para adicionar campos de upload dinamicamente (usada apenas em campos dinâmicos)
+      function addField(containerId, inputName, maxAllowed) {
+        const container = document.getElementById(containerId);
+        const inputs = container.querySelectorAll(`input[name="${inputName}"]`);
+        if (inputs.length < maxAllowed) {
+          const div = document.createElement('div');
+          div.className = 'input-group mb-2';
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.className = 'form-control';
+          input.name = inputName;
+          input.accept = '.pdf,.jpg,.png';
+          div.appendChild(input);
+          // Botão de adicionar
+          const addSpan = document.createElement('span');
+          addSpan.className = 'input-group-text add-btn';
+          addSpan.textContent = '+';
+          addSpan.onclick = function() { addField(containerId, inputName, maxAllowed); };
+          div.appendChild(addSpan);
+          // Botão de remover
+          const removeSpan = document.createElement('span');
+          removeSpan.className = 'input-group-text add-btn';
+          removeSpan.textContent = '−';
+          removeSpan.onclick = function() { div.remove(); };
+          div.appendChild(removeSpan);
+          container.appendChild(div);
         } else {
-          cargoSelect.innerHTML = '<option value="">SELECIONE O CARGO</option>';
-          result.data.forEach(cargo => {
-            const option = new Option(
-              `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`, 
-              cargo.id
-            );
-            // Armazena o nível exatamente como está no banco, por exemplo "NÍVEL FUNDAMENTAL INCOMPLETO", "NÍVEL FUNDAMENTAL COMPLETO" ou "NÍVEL SUPERIOR"
-            option.dataset.nivel = cargo.nivel;
-            option.dataset.requisitos = cargo.requisitos;
-            cargoSelect.add(option);
-          });
+          alert(`Você pode enviar no máximo ${maxAllowed} arquivos para este campo.`);
         }
-      } catch (error) {
-        console.error("Erro:", error);
-        cargoSelect.innerHTML = '<option value="">ERRO AO CARREGAR CARGOS</option>';
-      } finally {
-        cargoSelect.disabled = false;
-        loadingCargos.style.display = 'none';
-      }
-    });
-
-    // Atualiza documentos quando seleciona cargo
-    cargoSelect.addEventListener('change', function() {
-      const option = this.options[this.selectedIndex];
-      if (!option.value) {
-        documentosSection.style.display = 'none';
-        criteriosSection.style.display = 'none';
-        return;
-      }
-
-      // Exibe os requisitos
-      requisitosDiv.style.display = 'block';
-      requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
-
-      // Comprovante de escolaridade: obrigatório somente se o nível NÃO for "NÍVEL FUNDAMENTAL INCOMPLETO"
-      const docEscolaridadeInput = document.getElementById('docEscolaridade').querySelector('input');
-      if (option.dataset.nivel === "NÍVEL FUNDAMENTAL INCOMPLETO") {
-        docEscolaridadeInput.required = false;
-      } else {
-        docEscolaridadeInput.required = true;
-      }
-      document.getElementById('docEscolaridade').style.display = 'block';
-      
-      // Para cargos de nível superior, exibe o diploma e o torna obrigatório.
-      const isProfessor = option.text.toUpperCase().includes('PROFESSOR');
-      if (isProfessor && option.dataset.nivel !== "NÍVEL FUNDAMENTAL INCOMPLETO") {
-        document.getElementById('docDiploma').style.display = 'block';
-        document.getElementById('docDiploma').querySelector('input').required = true;
-      } else {
-        document.getElementById('docDiploma').style.display = 'none';
-        document.getElementById('docDiploma').querySelector('input').required = false;
       }
       
-      // Documentos específicos para Motorista
-      const docEspecifico = document.getElementById('docEspecifico');
-      docEspecifico.style.display = 'none';
-      if (option.text.toUpperCase().includes('MOTORISTA')) {
-        docEspecifico.style.display = 'block';
-        document.getElementById('labelDocEspecifico').textContent = 'CNH CATEGORIA D';
-      }
-
-      // Exibe ou oculta a seção de documentos para pontuação
-      criteriosSection.style.display = 'block';
-      // Se o cargo for de nível superior, mostra os campos adicionais
-      if (option.dataset.nivel === "NÍVEL SUPERIOR") {
-        document.getElementById('superiorFields').style.display = 'block';
-      } else {
-        document.getElementById('superiorFields').style.display = 'none';
-      }
-
-      documentosSection.style.display = 'block';
-    });
-
-    // Envio do formulário - VERSÃO CORRIGIDA
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const submitBtn = form.querySelector('button[type="submit"]');
-      const spinner = submitBtn.querySelector('.loading-spinner');
-      const submitText = submitBtn.querySelector('#submitText');
-      const mensagemDiv = document.getElementById('mensagem');
+      // Captura o CPF da URL
+      const urlParams = new URLSearchParams(window.location.search);
+      document.getElementById('cpf').value = urlParams.get('cpf') || '';
       
-      submitText.textContent = 'ENVIANDO...';
-      spinner.classList.remove('d-none');
-      submitBtn.disabled = true;
-      mensagemDiv.className = '';
-      mensagemDiv.textContent = '';
-
-      try {
-        const MAX_SIZE = 2 * 1024 * 1024; // 2MB
-        const MAX_PLANO_SIZE = 5 * 1024 * 1024; // 5MB
+      // Elementos do DOM
+      const zonaSelect = document.getElementById('zona');
+      const cargoSelect = document.getElementById('cargo');
+      const requisitosDiv = document.getElementById('requisitosCargo');
+      const loadingCargos = document.getElementById('loadingCargos');
+      const documentosSection = document.getElementById('documentosSection');
+      const criteriosSection = document.getElementById('criteriosSection');
+      const form = document.getElementById('inscricaoForm');
+      const tempoExercicioSelect = document.getElementById('tempo_exercicio_select');
+      const docTempoExercicioInput = document.getElementById('doc_tempo_exercicio');
+      
+      // Referência para o grupo de Tempo de Exercício e sua posição original
+      const tempoExercicioGroup = document.getElementById('tempoExercicioGroup');
+      const tempoExercicioOriginalParent = tempoExercicioGroup.parentNode;
+      const tempoExercicioOriginalNext = tempoExercicioGroup.nextElementSibling;
+      
+      // Mapeamento de zona (valores já são iguais)
+      const zoneMapping = {
+        "RURAL/ITAMUCURI": "RURAL/ITAMUCURI",
+        "RURAL/IPANEMA": "RURAL/IPANEMA",
+        "URBANA/SEDE": "URBANA/SEDE",
+        "RURAL/SANTA MARIA DO URUARÁ": "RURAL/SANTA MARIA DO URUARÁ",
+        "RURAL/PACOVAL": "RURAL/PACOVAL",
+        "RURAL/COLÔNIA DE CIMA": "RURAL/COLÔNIA DE CIMA",
+        "RURAL/GUAJARÁ": "RURAL/GUAJARÁ",
+        "RURAL/BOA VISTA DO CUÇARI": "RURAL/BOA VISTA DO CUÇARI",
+        "RURAL/TAMUATAÍ": "RURAL/TAMUATAÍ",
+        "RURAL/COLÔNIA DE BAIXO": "RURAL/COLÔNIA DE BAIXO",
+        "RURAL/RIBEIRINHA": "RURAL/RIBEIRINHA"
+      };
+      
+      // Busca cargos quando seleciona a zona
+      zonaSelect.addEventListener('change', async function() {
+        const zona = this.value;
+        const mappedZona = zoneMapping[zona] || zona;
         
-        // Cria FormData diretamente do formulário
-        const formData = new FormData(form);
-
-        // Verifica tamanhos dos arquivos (incluindo os novos campos de critérios)
-        const fileFields = [
-          'doc_identidade', 'doc_escolaridade', 'doc_diploma', 
-          'doc_especifico', 'doc_especializacao', 'doc_mestrado', 
-          'doc_doutorado', 'doc_plano_aula', 'doc_fundamental',
-          'doc_medio', 'doc_cursos', 'doc_pos', 'doc_qualificacao',
-          'doc_experiencia', 'doc_certificado'
-        ];
-
-        for (const field of fileFields) {
-          const fileInput = form.querySelector(`[name="${field}"]`);
-          if (fileInput && fileInput.files.length > 0) {
-            const maxSize = field === 'doc_plano_aula' ? MAX_PLANO_SIZE : MAX_SIZE;
-            // Para inputs com múltiplos arquivos, verifica cada um
-            for (let i = 0; i < fileInput.files.length; i++) {
-              if (fileInput.files[i].size > maxSize) {
-                throw new Error(`O arquivo ${field.replace(/_/g, ' ')} excede o tamanho máximo de ${maxSize/(1024*1024)}MB`);
+        if (!mappedZona) {
+          cargoSelect.innerHTML = '<option value="">SELECIONE A ZONA PRIMEIRO</option>';
+          cargoSelect.disabled = true;
+          documentosSection.style.display = 'none';
+          criteriosSection.style.display = 'none';
+          return;
+        }
+        
+        cargoSelect.innerHTML = '<option value="">CARREGANDO...</option>';
+        cargoSelect.disabled = true;
+        loadingCargos.style.display = 'block';
+        
+        try {
+          const response = await fetch(`/api/cargos?zona=${encodeURIComponent(mappedZona)}`);
+          if (!response.ok) throw new Error('Erro ao carregar cargos');
+          const result = await response.json();
+          if (!result.success || !Array.isArray(result.data)) {
+            throw new Error('Resposta inválida da API');
+          }
+          if (result.data.length === 0) {
+            cargoSelect.innerHTML = '<option value="">NENHUM CARGO DISPONÍVEL</option>';
+          } else {
+            cargoSelect.innerHTML = '<option value="">SELECIONE O CARGO</option>';
+            result.data.forEach(cargo => {
+              const option = new Option(
+                `${cargo.nome} - ${cargo.nivel} (Vagas: ${cargo.regioes[0].vagas_imediatas})`,
+                cargo.id
+              );
+              option.dataset.nivel = cargo.nivel;
+              option.dataset.requisitos = cargo.requisitos;
+              cargoSelect.add(option);
+            });
+          }
+        } catch (error) {
+          console.error("Erro:", error);
+          cargoSelect.innerHTML = '<option value="">ERRO AO CARREGAR CARGOS</option>';
+        } finally {
+          cargoSelect.disabled = false;
+          loadingCargos.style.display = 'none';
+        }
+      });
+      
+      // Atualiza os campos dos documentos com base no cargo selecionado
+      cargoSelect.addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        if (!option || !option.value) {
+          documentosSection.style.display = 'none';
+          criteriosSection.style.display = 'none';
+          // Esconde os grupos de certificado e cursos
+          document.getElementById('certificadoDefaultGroup').style.display = 'none';
+          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
+          document.getElementById('certificadoMedioGroup').style.display = 'none';
+          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
+          document.getElementById('cursosComplementaresGroup').style.display = 'none';
+          return;
+        }
+        
+        // Exibe os requisitos do cargo
+        if (requisitosDiv) {
+          requisitosDiv.style.display = 'block';
+          requisitosDiv.innerHTML = `<strong>Requisitos:</strong> ${option.dataset.requisitos || 'Não especificado'}`;
+        }
+        
+        // Ajusta o campo de REQUISITOS MÍNIMOS DO CARGO (Comprovante de Escolaridade)
+        const docEscolaridade = document.getElementById('docEscolaridade');
+        if (docEscolaridade) {
+          const docEscolaridadeInput = docEscolaridade.querySelector('input');
+          docEscolaridadeInput.required = true;
+          docEscolaridade.style.display = 'block';
+        }
+        
+        // Para cargos de Nível Superior, exibe "Plano de Aula" com limite de 5MB
+        const docDiploma = document.getElementById('docDiploma');
+        if (docDiploma) {
+          if (option.dataset.nivel === "NÍVEL SUPERIOR") {
+            docDiploma.style.display = 'block';
+            const inputDiploma = docDiploma.querySelector('input');
+            if (inputDiploma) {
+              inputDiploma.required = true;
+              document.getElementById('labelDiploma').textContent = 'Plano de Aula';
+              const info = docDiploma.querySelector('.file-info');
+              if (info) info.textContent = "PDF";
+            }
+          } else {
+            docDiploma.style.display = 'none';
+            const inputDiploma = docDiploma.querySelector('input');
+            if (inputDiploma) inputDiploma.required = false;
+          }
+        }
+        
+        // Documentos específicos para Motorista
+        const docEspecifico = document.getElementById('docEspecifico');
+        if (docEspecifico) {
+          docEspecifico.style.display = 'none';
+          if (option.text.toUpperCase().includes('MOTORISTA')) {
+            docEspecifico.style.display = 'block';
+            const labelDoc = document.getElementById('labelDocEspecifico');
+            if (labelDoc) labelDoc.textContent = 'CNH CATEGORIA D';
+          }
+        }
+        
+        // Exibe a seção de Documentos para Pontuação
+        if (criteriosSection) {
+          criteriosSection.style.display = 'block';
+        }
+        
+        // Ajusta os grupos de certificado e cursos conforme o nível:
+        if (option.dataset.nivel === "NÍVEL FUNDAMENTAL INCOMPLETO") {
+          document.getElementById('certificadoFundamentalGroup').style.display = 'block';
+          document.getElementById('certificadoMedioGroup').style.display = 'block';
+          document.getElementById('certificadoDefaultGroup').style.display = 'none';
+          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
+          document.getElementById('cursosComplementaresGroup').style.display = 'block';
+          document.getElementById('cursosContainer').innerHTML = `
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+          `;
+        } else if (option.dataset.nivel === "NÍVEL FUNDAMENTAL COMPLETO") {
+          document.getElementById('certificadoFundCompletoGroup').style.display = 'block';
+          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
+          document.getElementById('certificadoMedioGroup').style.display = 'none';
+          document.getElementById('certificadoDefaultGroup').style.display = 'none';
+          document.getElementById('cursosComplementaresGroup').style.display = 'block';
+          document.getElementById('cursosContainer').innerHTML = `
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+          `;
+        } else if (option.dataset.nivel === "NÍVEL SUPERIOR") {
+          // Para cargos de Nível Superior, não exibe Certificado de Conclusão e Cursos Complementares
+          document.getElementById('certificadoDefaultGroup').style.display = 'none';
+          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
+          document.getElementById('certificadoMedioGroup').style.display = 'none';
+          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
+          document.getElementById('cursosComplementaresGroup').style.display = 'none';
+          // Exibe os campos adicionais para Nível Superior
+          const superiorFields = document.getElementById('superiorFields');
+          if (superiorFields) {
+            superiorFields.style.display = 'block';
+          }
+          // Atualiza o rótulo e reposiciona o campo de Tempo de Exercício para o final
+          const tempoLabel = tempoExercicioGroup.querySelector('label');
+          if (tempoLabel) {
+            tempoLabel.innerHTML = 'TEMPO DE EXERCÍCIO NA ATIVIDADE PROFISSIONAL, NO CARGO/FUNÇÃO A QUE CONCORRE, SEM SOBREPOSIÇÃO DE TEMPO';
+          }
+          if (superiorFields) {
+            superiorFields.insertAdjacentElement('afterend', tempoExercicioGroup);
+          }
+        } else {
+          // Caso não seja nenhum dos anteriores, utiliza o padrão
+          document.getElementById('certificadoDefaultGroup').style.display = 'block';
+          document.getElementById('certificadoFundamentalGroup').style.display = 'none';
+          document.getElementById('certificadoMedioGroup').style.display = 'none';
+          document.getElementById('certificadoFundCompletoGroup').style.display = 'none';
+          document.getElementById('cursosComplementaresGroup').style.display = 'block';
+          document.getElementById('cursosContainer').innerHTML = `
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+            <div class="input-group mb-2">
+              <input type="file" class="form-control" name="doc_cursos" accept=".pdf,.jpg,.png">
+            </div>
+          `;
+          // Restaura o campo de Tempo de Exercício para sua posição original (caso tenha sido movido)
+          const tempoLabel = tempoExercicioGroup.querySelector('label');
+          if (tempoLabel) {
+            tempoLabel.innerHTML = 'Tempo de Exercício na Atividade Profissional';
+          }
+          if (tempoExercicioOriginalNext) {
+            tempoExercicioOriginalParent.insertBefore(tempoExercicioGroup, tempoExercicioOriginalNext);
+          } else {
+            tempoExercicioOriginalParent.appendChild(tempoExercicioGroup);
+          }
+        }
+      });
+      
+      // Controle do campo "Tempo de Exercício na Atividade Profissional"
+      tempoExercicioSelect.addEventListener('change', function() {
+        if (this.value !== "") {
+          docTempoExercicioInput.style.display = 'block';
+          // O campo não é definido como "required" para torná-lo opcional
+        } else {
+          docTempoExercicioInput.style.display = 'none';
+        }
+      });
+      
+      // Envio do formulário
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const spinner = submitBtn.querySelector('.loading-spinner');
+        const submitText = submitBtn.querySelector('#submitText');
+        const mensagemDiv = document.getElementById('mensagem');
+        
+        submitText.textContent = 'ENVIANDO...';
+        spinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+        mensagemDiv.className = '';
+        mensagemDiv.textContent = '';
+        
+        try {
+          const MAX_SIZE = 2 * 1024 * 1024;
+          const MAX_PLANO_SIZE = 5 * 1024 * 1024;
+          const formData = new FormData(form);
+          const fileFields = [
+            'doc_identidade', 'doc_escolaridade', 'doc_diploma', 
+            'doc_especifico', 'doc_especializacao', 'doc_mestrado', 
+            'doc_doutorado', 'doc_plano_aula', 'doc_experiencia', 
+            'doc_certificado', 'doc_cursos', 'doc_pos', 'doc_qualificacao', 'doc_outros', 
+            'doc_tempo_exercicio', 'doc_certificado_fundamental', 'doc_certificado_medio'
+          ];
+          
+          for (const field of fileFields) {
+            const fileInput = form.querySelector(`[name="${field}"]`);
+            if (fileInput && fileInput.files.length > 0) {
+              let maxSize = MAX_SIZE;
+              if (field === 'doc_plano_aula' || field === 'doc_tempo_exercicio') {
+                maxSize = MAX_PLANO_SIZE;
+              }
+              for (let i = 0; i < fileInput.files.length; i++) {
+                if (fileInput.files[i].size > maxSize) {
+                  throw new Error(`O arquivo ${field.replace(/_/g, ' ')} excede o tamanho máximo de ${maxSize/(1024*1024)}MB`);
+                }
               }
             }
           }
+          
+          if (!formData.get('doc_identidade')) {
+            throw new Error('Documento de identidade (RG/CNH) é obrigatório');
+          }
+          
+          // Removida a validação que exigia o anexo do documento de tempo de exercício
+          
+          const response = await fetch('/api/inscricoes/create', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(result.message || 'Erro ao enviar inscrição');
+          }
+          
+          mensagemDiv.classList.add('alert', 'alert-success');
+          mensagemDiv.textContent = 'Inscrição realizada com sucesso!';
+          
+          setTimeout(() => {
+            window.location.href = `/visualiza.html?cpf=${encodeURIComponent(document.getElementById('cpf').value)}`;
+          }, 2000);
+          
+        } catch (error) {
+          console.error("Erro:", error);
+          mensagemDiv.classList.add('alert', 'alert-danger');
+          mensagemDiv.textContent = error.message;
+        } finally {
+          submitText.textContent = 'CONCLUIR INSCRIÇÃO';
+          spinner.classList.add('d-none');
+          submitBtn.disabled = false;
         }
-
-        // Verifica documento de identidade obrigatório
-        if (!formData.get('doc_identidade')) {
-          throw new Error('Documento de identidade (RG/CNH) é obrigatório');
-        }
-
-        // Se o tempo de serviço for maior que 0, é obrigatório comprovar o tempo (CTPS)
-        if (parseFloat(tempoInput.value) > 0 && !formData.get('doc_experiencia')) {
-          throw new Error('Para tempo de serviço informado, é obrigatória a comprovação de tempo de exercício (CTPS).');
-        }
-
-        // Envia para a API
-        const response = await fetch('/api/inscricoes/create', {
-          method: 'POST',
-          body: formData
-        });
-
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.message || 'Erro ao enviar inscrição');
-        }
-
-        mensagemDiv.classList.add('alert', 'alert-success');
-        mensagemDiv.textContent = 'Inscrição realizada com sucesso!';
-        
-        setTimeout(() => {
-          window.location.href = `/visualiza.html?cpf=${encodeURIComponent(document.getElementById('cpf').value)}`;
-        }, 2000);
-        
-      } catch (error) {
-        console.error("Erro:", error);
-        mensagemDiv.classList.add('alert', 'alert-danger');
-        mensagemDiv.textContent = error.message;
-      } finally {
-        submitText.textContent = 'CONCLUIR INSCRIÇÃO';
-        spinner.classList.add('d-none');
-        submitBtn.disabled = false;
-      }
+      });
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -31,14 +31,20 @@ router.post('/create', handleUploadInscricoes, async (req, res) => {
       });
     }
 
-    const { cpf, cargo_id, zona, tempo_servico } = req.body;
+    // Atualize para extrair o campo "tempo_exercicio_select" (não obrigatório)
+    const { cpf, cargo_id, zona, tempo_exercicio_select } = req.body;
     
-    if (!cpf || !cargo_id || !zona || tempo_servico === undefined) {
+    if (!cpf || !cargo_id || !zona) {
       return res.status(400).json({ 
         success: false,
-        message: "CPF, cargo, zona e tempo de serviço são obrigatórios." 
+        message: "CPF, cargo e zona são obrigatórios." 
       });
     }
+    
+    // Se o campo de tempo de exercício não for informado, atribuímos um valor default (por exemplo, "0")
+    const tempo_exercicio = tempo_exercicio_select && tempo_exercicio_select.trim() !== ""
+      ? tempo_exercicio_select
+      : "0";
     
     const cargoRegiao = await CargoRegiao.findOne({
       where: { cargo_id, zona }
@@ -78,7 +84,7 @@ router.post('/create', handleUploadInscricoes, async (req, res) => {
       candidato_id: candidato.id,
       cargo_id,
       zona,
-      tempo_servico,
+      tempo_exercicio, // valor default "0" se não informado
       doc_identidade_path: req.files['doc_identidade'][0].filename,
       doc_escolaridade_path: req.files['doc_escolaridade'] ? req.files['doc_escolaridade'][0].filename : null,
       doc_diploma_path: req.files['doc_diploma'] ? req.files['doc_diploma'][0].filename : null,
@@ -87,6 +93,14 @@ router.post('/create', handleUploadInscricoes, async (req, res) => {
       doc_mestrado_path: req.files['doc_mestrado'] ? req.files['doc_mestrado'][0].filename : null,
       doc_doutorado_path: req.files['doc_doutorado'] ? req.files['doc_doutorado'][0].filename : null,
       doc_plano_aula_path: req.files['doc_plano_aula'] ? req.files['doc_plano_aula'][0].filename : null,
+      doc_certificado_path: req.files['doc_certificado'] ? req.files['doc_certificado'][0].filename : null,
+      doc_certificado_fundamental_path: req.files['doc_certificado_fundamental'] ? req.files['doc_certificado_fundamental'][0].filename : null,
+      doc_certificado_medio_path: req.files['doc_certificado_medio'] ? req.files['doc_certificado_medio'][0].filename : null,
+      doc_certificado_fund_completo_path: req.files['doc_certificado_fund_completo'] ? req.files['doc_certificado_fund_completo'][0].filename : null,
+      doc_cursos: req.files['doc_cursos'] ? JSON.stringify(req.files['doc_cursos'].map(f => f.filename)) : null,
+      doc_pos: req.files['doc_pos'] ? JSON.stringify(req.files['doc_pos'].map(f => f.filename)) : null,
+      doc_qualificacao: req.files['doc_qualificacao'] ? JSON.stringify(req.files['doc_qualificacao'].map(f => f.filename)) : null,
+      doc_tempo_exercicio_path: req.files['doc_tempo_exercicio'] ? req.files['doc_tempo_exercicio'][0].filename : null,
       status: 'PENDENTE'
     });
     

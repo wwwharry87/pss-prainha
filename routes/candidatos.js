@@ -24,9 +24,10 @@ router.get('/check', async (req, res) => {
   }
 });
 
+// routes/candidatos.js
 router.post('/create', handleUploadCandidatos, async (req, res) => {
   try {
-    let { cpf, rg, nome, data_nascimento, sexo, email, celular, cep, logradouro, bairro, numero, complemento, estado, municipio, pcd, senha } = req.body;
+    let { cpf, rg, orgao_expedidor, nome, data_nascimento, sexo, email, celular, cep, logradouro, bairro, numero, complemento, estado, municipio, pcd, senha } = req.body;
     cpf = cpf.replace(/\D/g, '');
     const existente = await Candidato.findOne({ where: { cpf } });
     if (existente) {
@@ -34,14 +35,14 @@ router.post('/create', handleUploadCandidatos, async (req, res) => {
     }
     const hashedSenha = await bcrypt.hash(senha, 10);
     let laudoFilename = null;
-    // Verifica se o campo "laudo" foi enviado
     if (req.files && req.files.laudo && req.files.laudo.length > 0) {
       laudoFilename = req.files.laudo[0].filename;
     }
     const novoCandidato = await Candidato.create({
       cpf,
       rg,
-      nome,
+      orgao_expedidor: orgao_expedidor.toUpperCase(), // Novo campo adicionado
+      nome: nome.toUpperCase(),
       data_nascimento,
       sexo,
       email,

@@ -11,6 +11,9 @@ const Candidato = sequelize.define('Candidato', {
   rg: {
     type: DataTypes.STRING,
   },
+  orgao_expedidor: {  // Novo campo adicionado
+    type: DataTypes.STRING,
+  },
   nome: {
     type: DataTypes.STRING,
     allowNull: false,
