@@ -27,6 +27,7 @@ const CargoRegiao = require('./models/CargoRegiao');
 Cargo.hasMany(CargoRegiao, { foreignKey: 'cargo_id', as: 'regioes' });
 CargoRegiao.belongsTo(Cargo, { foreignKey: 'cargo_id', as: 'cargo' });
 
+// Autentica e sincroniza os modelos com o banco de dados
 sequelize.authenticate()
   .then(() => {
     console.log("Conectado ao PostgreSQL!");
@@ -45,6 +46,8 @@ const inscricoesRouter = require('./routes/inscricoes');
 const visualizaRouter = require('./routes/visualiza');
 const authRouter = require('./routes/auth');
 const downloadRouter = require('./routes/download');
+// Nova rota para o ambiente administrativo de validação
+const adminRouter = require('./routes/admin');
 
 app.use("/api/candidatos", candidatosRouter);
 app.use("/api/cargos", cargosRouter);
@@ -52,6 +55,7 @@ app.use("/api/inscricoes", inscricoesRouter);
 app.use("/api/visualiza", visualizaRouter);
 app.use("/api/auth", authRouter);
 app.use('/download', downloadRouter);
+app.use("/api/admin", adminRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

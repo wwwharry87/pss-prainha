@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validação de Documentação - Área Administrativa</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .card-validacao { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .icon-btn { cursor: pointer; color: #0d6efd; margin-left: 5px; }
+    .select-validacao { max-width: 200px; }
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+    <!-- Barra de Pesquisa -->
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <input type="text" id="searchInput" class="form-control" placeholder="Digite o CPF do candidato">
+      </div>
+      <div class="col-md-6">
+        <button class="btn btn-primary" id="btnSearch">Buscar Candidato</button>
+      </div>
+    </div>
+    
+    <!-- Seção para exibir dados do candidato -->
+    <div id="candidateSection" class="mb-4"></div>
+    
+    <!-- Lista de Inscrições para Validação -->
+    <div id="inscriptionsSection" class="row"></div>
+  </div>
+
+  <!-- Modal para Visualização de Anexos -->
+  <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="previewModalLabel">Visualização de Anexo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <iframe id="previewFrame" src="" style="width: 100%; height: 80vh;" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Função para formatar CPF
+    function formatarCPF(cpf) {
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    }
+
+    // Abre o modal para visualizar o arquivo
+    function visualizarArquivo(filename) {
+      document.getElementById('previewFrame').src = `/download/${filename}?preview=true`;
+      const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+      modal.show();
+    }
+
+    // Busca o candidato e suas inscrições com base no CPF
+    async function buscarCandidato() {
+      const cpf = document.getElementById('searchInput').value.trim();
+      if (!cpf) {
+        alert("Informe o CPF para a pesquisa.");
+        return;
+      }
+      try {
+        // Ajuste a URL conforme o endpoint da sua API para consulta de inscrições por CPF
+        const response = await fetch(`/api/visualiza/${cpf}`);
+        const data = await response.json();
+        if (!response.ok) {
+          alert(data.message || "Erro ao buscar o candidato.");
+          return;
+        }
+        exibirCandidato(data.candidato);
+        exibirInscricoes(data.inscricoes || []);
+      } catch (error) {
+        console.error("Erro na busca:", error);
+      }
+    }
+
+    // Exibe os dados do candidato
+    function exibirCandidato(candidato) {
+      const candidateSection = document.getElementById('candidateSection');
+      candidateSection.innerHTML = `
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title text-uppercase">${candidato.nome}</h5>
+            <p class="card-text"><strong>CPF:</strong> ${formatarCPF(candidato.cpf)}</p>
+            <p class="card-text"><strong>E-mail:</strong> ${candidato.email}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // Monta a lista de documentos anexados de uma inscrição
+    function montarListaDocumentos(insc) {
+      const docs = [];
+      if (insc.doc_identidade_path) docs.push({ label: "RG ou CNH", filename: insc.doc_identidade_path });
+      if (insc.doc_escolaridade_path) docs.push({ label: "Comprovante de Escolaridade", filename: insc.doc_escolaridade_path });
+      if (insc.doc_diploma_path) docs.push({ label: "Diploma de Graduação", filename: insc.doc_diploma_path });
+      if (insc.doc_especifico_path) docs.push({ label: "Documento Adicional", filename: insc.doc_especifico_path });
+      if (insc.doc_especializacao_path) docs.push({ label: "Diploma de Especialização", filename: insc.doc_especializacao_path });
+      if (insc.doc_mestrado_path) docs.push({ label: "Diploma de Mestrado", filename: insc.doc_mestrado_path });
+      if (insc.doc_doutorado_path) docs.push({ label: "Diploma de Doutorado", filename: insc.doc_doutorado_path });
+      if (insc.doc_plano_aula_path) docs.push({ label: "Plano de Aula", filename: insc.doc_plano_aula_path });
+      if (insc.doc_cursos) {
+        try {
+          const cursos = JSON.parse(insc.doc_cursos);
+          cursos.forEach((fn, i) => {
+            docs.push({ label: `Curso Complementar ${i+1}`, filename: fn });
+          });
+        } catch (e) { console.error(e); }
+      }
+      if (insc.doc_tempo_exercicio_path) docs.push({ label: "Comprovante de Tempo de Exercício", filename: insc.doc_tempo_exercicio_path });
+      return docs;
+    }
+
+    // Exibe as inscrições e adiciona controles para validação de cada anexo
+    function exibirInscricoes(inscricoes) {
+      const container = document.getElementById('inscriptionsSection');
+      container.innerHTML = '';
+      if (inscricoes.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">Nenhuma inscrição encontrada para este candidato.</div>`;
+        return;
+      }
+      inscricoes.forEach((insc, index) => {
+        const documentos = montarListaDocumentos(insc);
+        let docsHTML = '';
+        if (documentos.length > 0) {
+          docsHTML += `<ul class="list-group">`;
+          documentos.forEach((doc, idx) => {
+            docsHTML += `
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>${doc.label}</strong>
+                  <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
+                </div>
+                <div>
+                  <select class="form-select form-select-sm select-validacao" id="validacao_${insc.id}_${idx}">
+                    <option value="">Selecione</option>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="rejeitado">Rejeitado</option>
+                  </select>
+                </div>
+              </li>
+            `;
+          });
+          docsHTML += `</ul>`;
+        }
+        const card = document.createElement('div');
+        card.className = 'col-md-6';
+        card.innerHTML = `
+          <div class="card card-validacao">
+            <div class="card-body">
+              <h5 class="card-title">Inscrição ${index + 1}</h5>
+              <p><strong>Cargo:</strong> ${insc.Cargo ? insc.Cargo.nome + ' - ' + insc.Cargo.nivel : 'Não Informado'}</p>
+              <p><strong>Zona:</strong> ${insc.zona}</p>
+              ${docsHTML}
+              <div class="mt-3">
+                <label for="obs_${insc.id}" class="form-label">Observações (opcional):</label>
+                <textarea class="form-control" id="obs_${insc.id}" rows="2" placeholder="Insira comentários se necessário"></textarea>
+              </div>
+              <button class="btn btn-success btn-sm mt-3" onclick="submitValidacao(${insc.id})">
+                Confirmar Validação
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Coleta os dados de validação e envia para o backend
+    async function submitValidacao(inscricaoId) {
+      // Seleciona todos os selects da inscrição (padrão "validacao_{inscricaoId}_{índice}")
+      const selects = document.querySelectorAll(`[id^="validacao_${inscricaoId}_"]`);
+      const validacoes = {};
+      selects.forEach((select, idx) => {
+        validacoes[idx] = select.value;
+      });
+      const observacoes = document.getElementById(`obs_${inscricaoId}`).value;
+      const dados = {
+        status: 'VALIDADO',
+        validacoes,
+        observacoes,
+        pontuacao: 0  // Aqui você pode adicionar lógica para calcular pontuação, se necessário
+      };
+
+      try {
+        const response = await fetch(`/api/admin/verificar-inscricao/${inscricaoId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados)
+        });
+        const result = await response.json();
+        alert(result.message || "Validação enviada com sucesso!");
+      } catch (error) {
+        console.error("Erro ao enviar validação:", error);
+        alert("Erro ao enviar os dados de validação.");
+      }
+    }
+
+    // Adiciona o evento de pesquisa
+    document.getElementById('btnSearch').addEventListener('click', buscarCandidato);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
