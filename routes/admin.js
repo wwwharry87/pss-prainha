@@ -72,7 +72,6 @@ router.get('/inscricoes', async (req, res) => {
     const inscricoes = await DashboardView.findAll({
       where,
       order: [['data_inscricao', 'DESC']],
-      limit: 100
     });
 
     res.json(inscricoes);

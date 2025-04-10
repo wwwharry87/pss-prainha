@@ -72,11 +72,37 @@
       border: 1px solid #dee2e6;
       border-radius: 5px;
     }
-    /* Ajusta a área da tabela para ocupar o espaço restante */
-    .table-responsive {
-      height: calc(100vh - 350px); /* Ajuste esse valor conforme a altura dos demais elementos */
-      overflow-y: auto;
-    }
+    /* Remova ou comente o overflow-x definido pelos estilos padrão da classe table-responsive */
+.table-responsive {
+  height: 100%; /* se necessário, ajuste a altura */
+  overflow-y: auto;
+  overflow-x: hidden;   /* impede o scroll horizontal */
+  width: 100%;          /* força a largura 100% */
+}
+
+
+/* Ajusta a fonte dos dados da tabela */
+.table {
+  font-family: 'Arial', sans-serif; /* ou outra família que você preferir */
+  font-size: 12px;  /* ajuste o tamanho da fonte conforme necessário */
+  color: #333;      /* cor do texto */
+}
+
+/* Opcional: ajuste a fonte nos cabeçalhos da tabela */
+.table thead th {
+  font-family: 'Arial', sans-serif;
+  font-size: 14px; /* pode ser maior para destacar */
+  font-weight: bold;
+  color: #000;
+}
+
+
+
+/* Força a tabela a ocupar 100% da largura do container */
+.table {
+  width: 100% !important;
+}
+
   </style>
 </head>
 <body>
@@ -86,7 +112,7 @@
       <button class="btn btn-dark me-2" id="sidebarToggle">
         <i class="bi bi-list"></i>
       </button>
-      <a class="navbar-brand" href="#">Painel Administrativo</a>
+      <a class="navbar-brand" href="#">Painel Administrativo ==> PSS 001/2025</a>
       <div class="d-flex">
         <button class="btn btn-outline-light me-2" id="refreshBtn">
           <i class="bi bi-arrow-clockwise"></i> Atualizar
@@ -490,11 +516,33 @@
                 return `<span class="badge bg-${badgeClass} badge-status">${data}</span>`;
               }
             },
-            { 
+            /*{ 
               data: 'data_inscricao',
               render: function(data) {
                 return new Date(data).toLocaleDateString('pt-BR');
-              }
+              }*/
+
+
+              { 
+                
+                data: 'data_inscricao',
+                render: function(data) {
+                    const dt = new Date(data);
+                    const options = {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                    };
+                    return dt.toLocaleString('pt-BR', options).replace(', ', ' às ');
+                },
+
+
+            
+
             },
             {
               data: 'inscricao_id',
