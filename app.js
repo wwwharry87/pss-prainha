@@ -1,4 +1,4 @@
-// app.js - Versão com ajustes CSP para carregar o DataTables e o domínio Render
+// app.js - Versão com ajustes CSP para carregar os recursos necessários, incluindo o CDN do Inputmask
 
 const express = require("express");
 const path = require("path");
@@ -19,6 +19,7 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com", // Adicionado para permitir o Inputmask
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
@@ -26,6 +27,7 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com", // Adicionado para permitir o Inputmask
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
@@ -108,7 +110,7 @@ sequelize
     }
   });
 
-// Servir arquivos estáticos a partir da pasta "frontend"
+// Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, "frontend")));
 
 // Rotas da API
