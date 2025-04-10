@@ -46,7 +46,7 @@ app.use(
           "'unsafe-inline'"
         ],
         imgSrc: ["'self'", "data:", "https://pss-prainha.onrender.com"],
-        connectSrc: ["'self'", "https://pss-prainha.onrender.com","https://viacep.com.br"],
+        connectSrc: ["'self'", "https://pss-prainha.onrender.com", "https://viacep.com.br", "https://cdn.datatables.net"],
         fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
         frameSrc: ["'self'"]
       }
