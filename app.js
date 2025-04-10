@@ -1,4 +1,4 @@
-// app.js - Versão com ajustes CSP para carregar o DataTables
+// app.js - Versão com ajustes CSP para carregar o DataTables e o domínio Render
 
 const express = require("express");
 const path = require("path");
@@ -14,35 +14,35 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
+        defaultSrc: ["'self'", "https://pss-prainha.onrender.com"],
         scriptSrc: [
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdn.datatables.net", // Adicionado para permitir DataTables
-          "'unsafe-inline'" // Necessário para scripts inline temporariamente
+          "https://cdn.datatables.net",
+          "'unsafe-inline'"
         ],
         scriptSrcElem: [
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdn.datatables.net", // Adicionado para permitir DataTables
+          "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
         styleSrc: [
           "'self'",
           "https://cdn.jsdelivr.net",
-          "https://cdn.datatables.net", // Adicionado para permitir CSS do DataTables
+          "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
         styleSrcElem: [
           "'self'",
           "https://cdn.jsdelivr.net",
-          "https://cdn.datatables.net", // Adicionado para permitir CSS do DataTables
+          "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
-        imgSrc: ["'self'", "data:", "https://*"],
-        connectSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https://pss-prainha.onrender.com"],
+        connectSrc: ["'self'", "https://pss-prainha.onrender.com"],
         fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
         frameSrc: ["'self'"]
       }
@@ -108,7 +108,7 @@ sequelize
     }
   });
 
-// Servir arquivos estáticos
+// Servir arquivos estáticos a partir da pasta "frontend"
 app.use(express.static(path.join(__dirname, "frontend")));
 
 // Rotas da API
