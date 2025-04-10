@@ -7,9 +7,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-  <!-- pdfMake para gerar o PDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/pdfmake.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/vfs_fonts.js"></script>
+  <!-- pdfMake para gerar o PDF (versões atualizadas) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.min.js"></script>
   <style>
     body { background-color: #f8f9fa; }
     .card-inscricao { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -61,7 +61,7 @@
   <script>
     let globalCandidato = null;
     let globalInscricoes = [];
-    let brasaoBase64 = null;  // Para armazenar o brasão em Base64
+    let brasaoBase64 = null;
 
     // Função para carregar uma imagem e convertê-la para Base64
     async function carregarImagemParaBase64(url) {
@@ -80,10 +80,16 @@
       }
     }
 
-    // Carrega a imagem do brasão (garanta que 'brasao.jpg' esteja acessível)
+    // Carrega a imagem do brasão
     carregarImagemParaBase64('brasao.jpg')
-      .then(base64 => { brasaoBase64 = base64; })
-      .catch(err => { console.error("Erro ao converter imagem:", err); brasaoBase64 = ""; });
+      .then(base64 => { 
+        brasaoBase64 = base64; 
+        console.log('Brasão carregado com sucesso');
+      })
+      .catch(err => { 
+        console.error("Erro ao converter imagem:", err); 
+        brasaoBase64 = ""; 
+      });
 
     // Função para formatar CPF
     function formatarCPF(cpf) {
@@ -117,7 +123,6 @@
         }
         globalCandidato = data.candidato;
         globalInscricoes = data.inscricoes || [];
-        // Ordena as inscrições pela data de criação (primeira inscrição primeiro)
         globalInscricoes.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         exibirDadosCandidato(globalCandidato);
         exibirInscricoes(globalInscricoes);
@@ -147,7 +152,6 @@
       `;
     }
 
-    // Função para montar a lista de documentos anexados de uma inscrição
     function montarListaDocumentos(insc) {
       const docs = [];
       if (insc.doc_identidade_path) docs.push({ label: "RG ou CNH", filename: insc.doc_identidade_path });
@@ -258,7 +262,6 @@
       }
     }
 
-    // Função para abrir o modal de visualização do arquivo
     function visualizarArquivo(filename) {
       const previewFrame = document.getElementById('previewFrame');
       previewFrame.src = `/download/${filename}?preview=true`;
@@ -271,12 +274,17 @@
         alert('Nenhuma inscrição para imprimir.');
         return;
       }
-      if (!brasaoBase64) {
-        alert('Imagem do brasão não carregada. Tente novamente.');
+      
+      if (typeof pdfMake === 'undefined' || typeof pdfMake.createPdf === 'undefined') {
+        alert('Erro ao carregar o gerador de PDF. Por favor, recarregue a página.');
         return;
       }
       
-      // Mapeamento para texto amigável do tempo de exercício
+      if (!brasaoBase64) {
+        console.warn('Imagem do brasão não carregada. Continuando sem imagem...');
+        brasaoBase64 = '';
+      }
+      
       const tempoMap = {
         "ate02": "até 2 anos",
         "de02a04": "2 a 4 anos",
@@ -284,13 +292,11 @@
         "mais06": "Mais de 6 anos"
       };
 
-      // Função auxiliar para obter o texto do tempo
       function formatarTempo(tempo) {
         return tempoMap[tempo] || tempo || "0";
       }
       
-      // Utilize a mesma função montarListaDocumentos para obter os anexos
-      function montarListaDocumentos(insc) {
+      function montarListaDocumentosPDF(insc) {
         const docs = [];
         if (insc.doc_identidade_path) docs.push("RG ou CNH");
         if (insc.doc_escolaridade_path) docs.push("Comprovante de Escolaridade");
@@ -300,6 +306,10 @@
         if (insc.doc_mestrado_path) docs.push("Diploma de Mestrado");
         if (insc.doc_doutorado_path) docs.push("Diploma de Doutorado");
         if (insc.doc_plano_aula_path) docs.push("Plano de Aula");
+        
+        if (insc.doc_certificado_fundamental_path) docs.push("Certificado de Conclusão do Nível Fundamental");
+        if (insc.doc_certificado_medio_path) docs.push("Certificado de Conclusão do Ensino Médio");
+        
         if (insc.doc_cursos) {
           try {
             const cursos = JSON.parse(insc.doc_cursos);
@@ -330,8 +340,18 @@
         return docs;
       }
       
+      // Definindo as fontes explicitamente
+      pdfMake.fonts = {
+        Roboto: {
+          normal: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf',
+          bold: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf',
+          italics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Italic.ttf',
+          bolditalics: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-MediumItalic.ttf'
+        }
+      };
+      
       const content = [
-        { image: brasaoBase64, width: 80, alignment: 'center' },
+        brasaoBase64 ? { image: brasaoBase64, width: 80, alignment: 'center' } : { text: '' },
         { text: 'MUNICÍPIO DE PRAINHA - PA', style: 'title', alignment: 'center' },
         { text: 'PROCESSO SELETIVO SIMPLIFICADO - 001/2025', style: 'title', alignment: 'center' },
         { text: '\nCOMPROVANTE DE INSCRIÇÕES\n', style: 'header', alignment: 'center' },
@@ -349,7 +369,7 @@
           dataInscricao = dt.toLocaleString('pt-BR');
         }
         
-        const docs = montarListaDocumentos(insc);
+        const docs = montarListaDocumentosPDF(insc);
         
         content.push(
           { text: `${index + 1}ª INSCRIÇÃO`, style: 'inscHeader', alignment: 'center', color: 'black' },
@@ -397,7 +417,7 @@
       });
       
       const docDefinition = {
-        content,
+        content: content,
         styles: {
           title: { fontSize: 14, bold: true },
           header: { fontSize: 16, bold: true },
@@ -406,13 +426,24 @@
           tableHeader: { bold: true, fillColor: '#eeeeee' },
           tableData: { fontSize: 10 },
           small: { fontSize: 8, italics: true }
+        },
+        defaultStyle: {
+          font: 'Roboto'
         }
       };
       
-      pdfMake.createPdf(docDefinition).open();
+      try {
+        pdfMake.createPdf(docDefinition).open();
+      } catch (e) {
+        console.error('Erro ao gerar PDF:', e);
+        alert('Erro ao gerar PDF. Por favor, tente novamente.');
+      }
     }
 
-    carregarDados();
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+      carregarDados();
+    });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

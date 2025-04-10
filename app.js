@@ -19,7 +19,7 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdnjs.cloudflare.com", // Necessário para o Inputmask
+          "https://cdnjs.cloudflare.com",
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
@@ -27,11 +27,10 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdnjs.cloudflare.com", // Necessário para o Inputmask
+          "https://cdnjs.cloudflare.com",
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
-        // Permite inline event handlers:
         scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: [
           "'self'",
@@ -46,8 +45,18 @@ app.use(
           "'unsafe-inline'"
         ],
         imgSrc: ["'self'", "data:", "https://pss-prainha.onrender.com"],
-        connectSrc: ["'self'", "https://pss-prainha.onrender.com", "https://viacep.com.br", "https://cdn.datatables.net"],
-        fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        connectSrc: [
+          "'self'", 
+          "https://pss-prainha.onrender.com", 
+          "https://viacep.com.br", 
+          "https://cdn.datatables.net",
+          "https://cdnjs.cloudflare.com" // Adicionado para permitir fontes do PDFMake
+        ],
+        fontSrc: [
+          "'self'", 
+          "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com" // Adicionado para permitir fontes do PDFMake
+        ],
         frameSrc: ["'self'"]
       }
     },
