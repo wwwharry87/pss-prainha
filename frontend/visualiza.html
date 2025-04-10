@@ -158,6 +158,14 @@
       if (insc.doc_mestrado_path) docs.push({ label: "Diploma de Mestrado", filename: insc.doc_mestrado_path });
       if (insc.doc_doutorado_path) docs.push({ label: "Diploma de Doutorado", filename: insc.doc_doutorado_path });
       if (insc.doc_plano_aula_path) docs.push({ label: "Plano de Aula", filename: insc.doc_plano_aula_path });
+      
+      if (insc.doc_certificado_fundamental_path) {
+        docs.push({ label: "Certificado de Conclusão do Nível Fundamental", filename: insc.doc_certificado_fundamental_path });
+      }
+      if (insc.doc_certificado_medio_path) {
+        docs.push({ label: "Certificado de Conclusão do Ensino Médio", filename: insc.doc_certificado_medio_path });
+      }
+
       if (insc.doc_cursos) {
         try {
           const cursos = JSON.parse(insc.doc_cursos);
