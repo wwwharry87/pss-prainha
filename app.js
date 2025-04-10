@@ -1,4 +1,4 @@
-// app.js - Versão com ajustes CSP para carregar os recursos necessários, incluindo o CDN do Inputmask
+// app.js - Versão com ajustes CSP para Render e inline event handlers
 
 const express = require("express");
 const path = require("path");
@@ -19,7 +19,7 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdnjs.cloudflare.com", // Adicionado para permitir o Inputmask
+          "https://cdnjs.cloudflare.com", // Necessário para o Inputmask
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
@@ -27,10 +27,12 @@ app.use(
           "'self'",
           "https://code.jquery.com",
           "https://cdn.jsdelivr.net",
-          "https://cdnjs.cloudflare.com", // Adicionado para permitir o Inputmask
+          "https://cdnjs.cloudflare.com", // Necessário para o Inputmask
           "https://cdn.datatables.net",
           "'unsafe-inline'"
         ],
+        // Permite inline event handlers:
+        scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: [
           "'self'",
           "https://cdn.jsdelivr.net",
@@ -49,7 +51,7 @@ app.use(
         frameSrc: ["'self'"]
       }
     },
-    crossOriginEmbedderPolicy: false // Necessário para iframes de visualização
+    crossOriginEmbedderPolicy: false
   })
 );
 
