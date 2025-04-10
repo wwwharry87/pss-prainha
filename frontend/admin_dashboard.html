@@ -118,9 +118,9 @@
           <i class="bi bi-arrow-clockwise"></i> Atualizar
         </button>
         <!-- Botão de Logout, agora chama a função logout() -->
-        <button class="btn btn-danger" onclick="logout()">
-          <i class="bi bi-box-arrow-right"></i> Sair
-        </button>
+        <button class="btn btn-danger" id="logoutBtn">
+            <i class="bi bi-box-arrow-right"></i> Sair
+          </button>
       </div>
     </div>
   </nav>
@@ -325,12 +325,11 @@
       });
 
       // Função de Logout: limpa localStorage, sessionStorage e força redirecionamento sem possibilidade de retorno
-      function logout() {
-        sessionStorage.clear();
-        localStorage.clear();
-        // Redireciona usando replace para remover da história
-        window.location.replace('/index.html');
-      }
+      document.getElementById('logoutBtn').addEventListener('click', function() {
+      sessionStorage.clear();
+      localStorage.clear();
+      window.location.replace('/index.html');
+    });
 
       // Sidebar
       function initSidebar() {
