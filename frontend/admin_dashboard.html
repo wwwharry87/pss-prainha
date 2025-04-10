@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self'; 
+    script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline'; 
+    script-src-elem 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    style-src 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    style-src-elem 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    img-src 'self' data: https://*; 
+    font-src 'self' https://cdn.jsdelivr.net; 
+    connect-src 'self'; 
+    frame-src 'self'">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+  <style>
+    :root {
+      --sidebar-width: 250px;
+    }
+    body { 
+      background-color: #f8f9fa;
+      padding-top: 56px;
+    }
+    .sidebar {
+      width: var(--sidebar-width);
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 56px;
+      background: #343a40;
+      transition: all 0.3s;
+    }
+    .main-content {
+      margin-left: var(--sidebar-width);
+      transition: all 0.3s;
+    }
+    .sidebar.collapsed {
+      left: calc(-1 * var(--sidebar-width));
+    }
+    .main-content.expanded {
+      margin-left: 0;
+    }
+    .nav-link {
+      color: rgba(255,255,255,.5);
+    }
+    .nav-link:hover, .nav-link.active {
+      color: white;
+      background-color: rgba(255,255,255,.1);
+    }
+    .card-dashboard {
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      transition: transform 0.3s;
+    }
+    .card-dashboard:hover {
+      transform: translateY(-5px);
+    }
+    .badge-status {
+      font-size: 0.8rem;
+      padding: 0.35em 0.65em;
+    }
+    .preview-iframe {
+      width: 100%;
+      height: 70vh;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+    }
+    /* Ajusta a área da tabela para ocupar o espaço restante */
+    .table-responsive {
+      height: calc(100vh - 350px); /* Ajuste esse valor conforme a altura dos demais elementos */
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <button class="btn btn-dark me-2" id="sidebarToggle">
+        <i class="bi bi-list"></i>
+      </button>
+      <a class="navbar-brand" href="#">Painel Administrativo</a>
+      <div class="d-flex">
+        <button class="btn btn-outline-light me-2" id="refreshBtn">
+          <i class="bi bi-arrow-clockwise"></i> Atualizar
+        </button>
+        <!-- Botão de Logout, agora chama a função logout() -->
+        <button class="btn btn-danger" onclick="logout()">
+          <i class="bi bi-box-arrow-right"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="p-3">
+      <!-- Busca global (dashboard) -->
+      <div class="input-group mb-3">
+        <input type="text" class="form-control form-control-sm" placeholder="Buscar candidato..." id="searchInput">
+        <button class="btn btn-primary btn-sm" type="button" id="searchBtn">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+    </div>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link active" href="#" data-section="dashboard">
+          <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-section="inscricoes">
+          <i class="bi bi-list-check me-2"></i>Inscrições
+        </a>
+      </li>
+      <!-- A opção de Validação está desabilitada -->
+    </ul>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content" id="mainContent">
+    <div class="container-fluid p-4">
+      <!-- Dashboard Section -->
+      <div id="dashboardSection">
+        <!-- Resumo -->
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <div class="card card-dashboard bg-primary text-white">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h5 class="card-title">Total de Inscritos</h5>
+                    <h2 class="mb-0" id="totalInscritos">0</h2>
+                  </div>
+                  <i class="bi bi-people-fill" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card card-dashboard bg-success text-white">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h5 class="card-title">Validados</h5>
+                    <h2 class="mb-0" id="totalValidados">0</h2>
+                  </div>
+                  <i class="bi bi-check-circle-fill" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card card-dashboard bg-warning text-white">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h5 class="card-title">Pendentes</h5>
+                    <h2 class="mb-0" id="totalPendentes">0</h2>
+                  </div>
+                  <i class="bi bi-clock-fill" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Abas de Gráficos -->
+        <div class="row mb-4">
+          <div class="col-md-12">
+            <ul class="nav nav-tabs" id="chartTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="cargo-tab" data-bs-toggle="tab" data-bs-target="#cargo-tab-pane" type="button" role="tab" aria-controls="cargo-tab-pane" aria-selected="true">
+                  Por Cargo
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="regiao-tab" data-bs-toggle="tab" data-bs-target="#regiao-tab-pane" type="button" role="tab" aria-controls="regiao-tab-pane" aria-selected="false">
+                  Por Região
+                </button>
+              </li>
+            </ul>
+            <div class="tab-content" id="chartTabsContent">
+              <div class="tab-pane fade show active" id="cargo-tab-pane" role="tabpanel" aria-labelledby="cargo-tab">
+                <canvas id="cargoChart"></canvas>
+              </div>
+              <div class="tab-pane fade" id="regiao-tab-pane" role="tabpanel" aria-labelledby="regiao-tab">
+                <canvas id="regiaoChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção de Inscrições -->
+      <div id="inscricoesSection" style="display: none;">
+        <div class="card card-dashboard">
+          <div class="card-body">
+            <div class="d-flex justify-content-between mb-3">
+              <h5 class="card-title">Lista de Inscrições</h5>
+              <div class="input-group" style="width: 300px;">
+                <input type="text" class="form-control" placeholder="Filtrar..." id="filterInput">
+                <button class="btn btn-outline-secondary" type="button" id="clearFilter">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover" id="inscricoesTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>Cargo</th>
+                    <th>Região</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- A seção de Validação permanece desabilitada -->
+    </div>
+  </div>
+
+  <!-- Modal para Visualização de Documentos -->
+  <div class="modal fade" id="documentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Visualização de Documento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <iframe src="" class="preview-iframe" id="documentPreview"></iframe>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Detalhar Cargos por Região -->
+  <div class="modal fade" id="regionDetailModal" tabindex="-1" aria-labelledby="regionDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="regionDetailModalLabel">Detalhes de Inscrições na Região</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Cargo</th>
+                <th>Quantidade</th>
+              </tr>
+            </thead>
+            <tbody id="regionDetailTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // Variável global para armazenar o total de inscritos
+    window.totalInscritosGlobal = 0;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      let cargoChart, regiaoChart, inscricoesTable;
+
+      $(document).ready(function() {
+        initSidebar();
+        loadDashboardData();
+        initDataTable();
+        setupEventListeners();
+      });
+
+      // Função de Logout: limpa localStorage, sessionStorage e força redirecionamento sem possibilidade de retorno
+      function logout() {
+        sessionStorage.clear();
+        localStorage.clear();
+        // Redireciona usando replace para remover da história
+        window.location.replace('/index.html');
+      }
+
+      // Sidebar
+      function initSidebar() {
+        $('#sidebarToggle').click(function() {
+          $('#sidebar').toggleClass('collapsed');
+          $('#mainContent').toggleClass('expanded');
+        });
+
+        $('[data-section]').click(function(e) {
+          e.preventDefault();
+          const section = $(this).data('section');
+          $('[data-section]').removeClass('active');
+          $(this).addClass('active');
+          $('#dashboardSection, #inscricoesSection').hide();
+          $(`#${section}Section`).show();
+
+          if (section === 'dashboard') loadDashboardData();
+          if (section === 'inscricoes') reloadInscricoesTable();
+        });
+      }
+
+      // Dashboard: Carrega os dados do endpoint e atualiza os summary cards e os gráficos
+      async function loadDashboardData() {
+        try {
+          const response = await fetch('/api/admin/dashboard-data');
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Erro ao carregar dados');
+          updateSummaryCards(data.totais);
+          renderCharts(data.porCargo, data.porRegiao);
+        } catch (error) {
+          console.error('Erro no dashboard:', error);
+          alert('Erro ao carregar dados do dashboard');
+        }
+      }
+
+      function updateSummaryCards(totais) {
+        $('#totalInscritos').text(totais.total || 0);
+        $('#totalValidados').text(totais.validados || 0);
+        $('#totalPendentes').text(totais.pendentes || 0);
+        window.totalInscritosGlobal = totais.total || 0;
+      }
+
+      // Renderiza os gráficos nas abas
+      function renderCharts(cargoData, regiaoData) {
+        // Gráfico de Inscrições por Cargo (vertical)
+        const cargoCtx = document.getElementById('cargoChart').getContext('2d');
+        if (cargoChart) cargoChart.destroy();
+        cargoChart = new Chart(cargoCtx, {
+          type: 'bar',
+          data: {
+            labels: cargoData.map(item => item.cargo_nome),
+            datasets: [{
+              label: 'Inscritos',
+              data: cargoData.map(item => item.total),
+              backgroundColor: 'rgba(13, 110, 253, 0.7)'
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const value = context.raw;
+                    const percentage = window.totalInscritosGlobal > 0 ? Math.round((value / window.totalInscritosGlobal) * 100) : 0;
+                    return `${context.label}: ${value} (${percentage}%)`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+          }
+        });
+
+        // Gráfico Horizontal de Inscrições por Região
+        const regiaoCtx = document.getElementById('regiaoChart').getContext('2d');
+        if (regiaoChart) regiaoChart.destroy();
+        regiaoChart = new Chart(regiaoCtx, {
+          type: 'bar',
+          data: {
+            labels: regiaoData.map(item => item.regiao),
+            datasets: [{
+              label: 'Inscritos',
+              data: regiaoData.map(item => item.total),
+              backgroundColor: [
+                '#0d6efd', '#6610f2', '#6f42c1', '#d63384', '#fd7e14',
+                '#ffc107', '#198754', '#20c997', '#0dcaf0', '#6c757d'
+              ]
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const value = context.raw;
+                    const percentage = window.totalInscritosGlobal > 0 ? Math.round((value / window.totalInscritosGlobal) * 100) : 0;
+                    return `${context.label}: ${value} (${percentage}%)`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+          }
+        });
+
+        // Evento de clique no gráfico de Região: mostra detalhes dos cargos naquela região
+        document.getElementById('regiaoChart').onclick = async function(evt) {
+          let points = regiaoChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+          if (points.length > 0) {
+            const index = points[0].index;
+            const region = regiaoChart.data.labels[index];
+            const cargos = await fetchCargosPorRegiao(region);
+            let tableBodyHtml = '';
+            cargos.forEach(item => {
+              tableBodyHtml += `<tr><td>${item.cargo}</td><td>${item.count}</td></tr>`;
+            });
+            document.getElementById('regionDetailTableBody').innerHTML = tableBodyHtml;
+            document.getElementById('regionDetailModalLabel').innerText = `Detalhes de Inscrições na Região: ${region}`;
+            let detailModal = new bootstrap.Modal(document.getElementById('regionDetailModal'));
+            detailModal.show();
+          }
+        };
+      }
+
+      // Busca e agrupa as inscrições por cargo para uma dada região
+      async function fetchCargosPorRegiao(region) {
+        try {
+          const response = await fetch(`/api/admin/inscricoes?regiao=${encodeURIComponent(region)}`);
+          const data = await response.json();
+          const group = {};
+          data.forEach(insc => {
+            if (insc.cargo_nome) {
+              group[insc.cargo_nome] = (group[insc.cargo_nome] || 0) + 1;
+            }
+          });
+          const result = [];
+          for (const cargo in group) {
+            result.push({ cargo: cargo, count: group[cargo] });
+          }
+          return result;
+        } catch (error) {
+          console.error("Erro ao obter cargos:", error);
+          return [];
+        }
+      }
+
+      // Tabela de Inscrições (DataTable)
+      function initDataTable() {
+        inscricoesTable = $('#inscricoesTable').DataTable({
+          ajax: {
+            url: '/api/admin/inscricoes',
+            dataSrc: ''
+          },
+          columns: [
+            { data: 'inscricao_id' },
+            { data: 'candidato_nome' },
+            { 
+              data: 'candidato_cpf',
+              render: function(data) {
+                return data.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+              }
+            },
+            { data: 'cargo_nome' },
+            { data: 'regiao' },
+            { 
+              data: 'status',
+              render: function(data) {
+                const statusMap = {
+                  'VALIDADO': 'success',
+                  'PENDENTE': 'warning',
+                  'REJEITADO': 'danger'
+                };
+                const badgeClass = statusMap[data] || 'secondary';
+                return `<span class="badge bg-${badgeClass} badge-status">${data}</span>`;
+              }
+            },
+            { 
+              data: 'data_inscricao',
+              render: function(data) {
+                return new Date(data).toLocaleDateString('pt-BR');
+              }
+            },
+            {
+              data: 'inscricao_id',
+              render: function(data) {
+                return `
+                  <button class="btn btn-sm btn-outline-primary view-btn" data-id="${data}">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                `;
+              },
+              orderable: false
+            }
+          ],
+          columnDefs: [
+            { targets: 0, width: "50px" },
+            { targets: 1, width: "200px" },
+            { targets: 2, width: "120px" },
+            { targets: 3, width: "150px" },
+            { targets: 4, width: "120px" },
+            { targets: 5, width: "100px" },
+            { targets: 6, width: "100px" },
+            { targets: 7, width: "80px" }
+          ],
+          language: {
+            url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
+          }
+        });
+
+        $('#inscricoesTable').on('click', '.view-btn', function() {
+          const inscricaoId = $(this).data('id');
+          alert('Visualizando inscrição ' + inscricaoId);
+        });
+      }
+
+      function reloadInscricoesTable() {
+        inscricoesTable.ajax.reload();
+      }
+
+      // Evento para o botão de busca global
+      function setupEventListeners() {
+        $('#refreshBtn').click(loadDashboardData);
+        $('#searchBtn').click(function() {
+          const cpf = $('#searchInput').val().replace(/\D/g, '');
+          if (cpf.length === 11) {
+            searchCandidate(cpf);
+          } else {
+            alert('Informe um CPF válido (11 dígitos)');
+          }
+        });
+        $('#filterInput').keyup(function() {
+          inscricoesTable.search(this.value).draw();
+        });
+        $('#clearFilter').click(function() {
+          $('#filterInput').val('');
+          inscricoesTable.search('').draw();
+        });
+      }
+
+      async function searchCandidate(cpf) {
+        try {
+          const response = await fetch(`/api/admin/candidato/${cpf}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Candidato não encontrado');
+          console.log("Dados do candidato:", data.candidato);
+        } catch (error) {
+          console.error('Erro na busca:', error);
+          alert(error.message);
+        }
+      }
+
+      window.reloadInscricoesTable = reloadInscricoesTable;
+    });
+  </script>
+</body>
+</html>
