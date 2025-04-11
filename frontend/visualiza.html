@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MINHAS INSCRIÇÕES - PSS Prainha</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-  <!-- pdfMake para gerar o PDF (versões atualizadas) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.min.js"></script>
   <style>
@@ -19,7 +17,6 @@
 </head>
 <body>
   <div class="container my-5">
-    <!-- Botão de Logout -->
     <div class="d-flex justify-content-end mb-3">
       <a href="index.html" class="btn btn-danger">
         <i class="bi bi-box-arrow-right"></i> Sair
@@ -28,10 +25,8 @@
     
     <h1 class="text-center text-primary mb-4">MINHAS INSCRIÇÕES</h1>
     
-    <!-- Dados do candidato -->
     <div id="dadosCandidato" class="mb-4"></div>
     
-    <!-- Spinner de carregamento -->
     <div id="loading" class="d-none text-center">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
@@ -39,11 +34,9 @@
       <p>Carregando inscrições, por favor aguarde...</p>
     </div>
     
-    <!-- Lista de inscrições -->
     <div id="inscricoes" class="row g-3"></div>
   </div>
   
-  <!-- Modal de Visualização de Anexo -->
   <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
@@ -63,7 +56,6 @@
     let globalInscricoes = [];
     let brasaoBase64 = null;
 
-    // Função para carregar uma imagem e convertê-la para Base64
     async function carregarImagemParaBase64(url) {
       try {
         const response = await fetch(url);
@@ -80,7 +72,6 @@
       }
     }
 
-    // Carrega a imagem do brasão
     carregarImagemParaBase64('brasao.jpg')
       .then(base64 => { 
         brasaoBase64 = base64; 
@@ -91,12 +82,10 @@
         brasaoBase64 = ""; 
       });
 
-    // Função para formatar CPF
     function formatarCPF(cpf) {
       return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     }
 
-    // Obtém o token ou CPF da URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const cpfParam = urlParams.get('cpf');
@@ -164,8 +153,8 @@
       if (insc.doc_plano_aula_path) docs.push({ label: "Plano de Aula", filename: insc.doc_plano_aula_path });
       
       // Tratamento especial para cargo_id = 5
-      if (insc.cargo_id === 5 && insc.doc_certificado_fundamental_path) {
-        docs.push({ label: "Certificado de Conclusão do Ensino Médio", filename: insc.doc_certificado_fundamental_path });
+      if (insc.cargo_id === 5 && insc.doc_certificado_fund_completo_path) {
+        docs.push({ label: "Certificado de Conclusão do Ensino Fundamental", filename: insc.doc_certificado_fund_completo_path });
       } else if (insc.doc_certificado_fundamental_path) {
         docs.push({ label: "Certificado de Conclusão do Nível Fundamental", filename: insc.doc_certificado_fundamental_path });
       }
@@ -312,8 +301,8 @@
         if (insc.doc_plano_aula_path) docs.push("Plano de Aula");
         
         // Tratamento especial para cargo_id = 5
-        if (insc.cargo_id === 5 && insc.doc_certificado_fundamental_path) {
-          docs.push("Certificado de Conclusão do Ensino Médio");
+        if (insc.cargo_id === 5 && insc.doc_certificado_fund_completo_path) {
+          docs.push("Certificado de Conclusão do Ensino Fundamental");
         } else if (insc.doc_certificado_fundamental_path) {
           docs.push("Certificado de Conclusão do Nível Fundamental");
         }
@@ -352,7 +341,6 @@
         return docs;
       }
       
-      // Definindo as fontes explicitamente
       pdfMake.fonts = {
         Roboto: {
           normal: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf',
@@ -452,7 +440,6 @@
       }
     }
 
-    // Inicialização
     document.addEventListener('DOMContentLoaded', function() {
       carregarDados();
     });
