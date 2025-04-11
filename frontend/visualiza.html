@@ -154,7 +154,7 @@
       
       // Tratamento especial para cargo_id = 5
       if (insc.cargo_id === 5 && insc.doc_certificado_fund_completo_path) {
-        docs.push({ label: "Certificado de Conclusão do Ensino Fundamental", filename: insc.doc_certificado_fund_completo_path });
+        docs.push({ label: "Certificado de Conclusão do Ensino Médio", filename: insc.doc_certificado_fund_completo_path });
       } else if (insc.doc_certificado_fundamental_path) {
         docs.push({ label: "Certificado de Conclusão do Nível Fundamental", filename: insc.doc_certificado_fundamental_path });
       }
@@ -302,9 +302,9 @@
         
         // Tratamento especial para cargo_id = 5
         if (insc.cargo_id === 5 && insc.doc_certificado_fund_completo_path) {
-          docs.push("Certificado de Conclusão do Ensino Fundamental");
+          docs.push("Certificado de Conclusão do Ensino Médio");
         } else if (insc.doc_certificado_fundamental_path) {
-          docs.push("Certificado de Conclusão do Nível Fundamental");
+          docs.push("Certificado de Conclusão do Ensino Médio");
         }
         
         if (insc.doc_certificado_medio_path) {
