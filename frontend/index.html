@@ -6,6 +6,8 @@
   <title>PSS Prainha - Página Inicial</title>
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
   <!-- jQuery e Inputmask para os campos do modal -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
@@ -14,6 +16,28 @@
     .card { transition: transform 0.3s; }
     .card:hover { transform: translateY(-5px); }
     .logo { width: 80px; height: auto; }
+    .btn-loading {
+      position: relative;
+    }
+    .btn-loading::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin: auto;
+      border: 4px solid transparent;
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: button-loading-spinner 1s ease infinite;
+    }
+    @keyframes button-loading-spinner {
+      from { transform: rotate(0turn); }
+      to { transform: rotate(1turn); }
+    }
   </style>
 </head>
 <body>
@@ -117,20 +141,21 @@
                 <input type="text" class="form-control" id="recuperarCelular" placeholder="(99) 99999-9999" required>
               </div>
               <button type="button" class="btn btn-primary w-100" id="btnVerificarRecuperacao">Verificar Dados</button>
+              <div id="recuperarMensagemStep1" class="mt-3"></div>
             </div>
             <!-- Etapa 2: Redefinição da Senha -->
             <div id="step2" style="display: none;">
               <div class="mb-3">
-                <label for="novaSenha" class="form-label">Nova Senha</label>
-                <input type="password" class="form-control" id="novaSenha" required>
+                <label for="novaSenha" class="form-label">Nova Senha (mínimo 6 caracteres)</label>
+                <input type="password" class="form-control" id="novaSenha" required minlength="6">
               </div>
               <div class="mb-3">
                 <label for="confirmarNovaSenha" class="form-label">Confirmar Nova Senha</label>
-                <input type="password" class="form-control" id="confirmarNovaSenha" required>
+                <input type="password" class="form-control" id="confirmarNovaSenha" required minlength="6">
               </div>
-              <button type="submit" class="btn btn-success w-100">Redefinir Senha</button>
+              <button type="submit" class="btn btn-success w-100" id="btnRedefinirSenha">Redefinir Senha</button>
+              <div id="recuperarMensagemStep2" class="mt-3"></div>
             </div>
-            <div id="recuperarMensagem" class="mt-3"></div>
           </div>
         </form>
       </div>
@@ -207,162 +232,269 @@
       const cpfInput = document.getElementById('novoCpf');
       const btnCadastrar = document.getElementById('btnCadastrar');
       const cpfLimpo = cpfInput.value.replace(/\D/g, '');
+      
       if (cpfLimpo.length !== 11) {
         alert('CPF inválido! Por favor, verifique e tente novamente.');
         cpfInput.classList.add('is-invalid');
         return;
       }
+      
       cpfInput.classList.remove('is-invalid');
       btnCadastrar.disabled = true;
-      btnCadastrar.textContent = "Verificando...";
+      btnCadastrar.classList.add('btn-loading');
+      btnCadastrar.innerHTML = '<span class="invisible">Verificando...</span>';
+      
       try {
         const response = await fetch(`/api/candidatos/check?cpf=${cpfLimpo}`);
         const data = await response.json();
+        
         if (data.exists) {
           alert(data.message);
-          btnCadastrar.disabled = false;
-          btnCadastrar.textContent = "Cadastrar-se";
-          return;
+        } else {
+          window.location.href = '/cadastro.html?cpf=' + cpfLimpo;
         }
-        window.location.href = '/cadastro.html?cpf=' + cpfLimpo;
       } catch (error) {
         console.error(error);
         alert('Erro ao verificar CPF. Tente novamente.');
+      } finally {
         btnCadastrar.disabled = false;
+        btnCadastrar.classList.remove('btn-loading');
         btnCadastrar.textContent = "Cadastrar-se";
       }
     }
 
-    // Função de login do candidato (existe na opção "Acompanhe seu cadastro")
+    // Função de login do candidato
     async function validarLogin() {
       const cpfInput = document.getElementById('loginCpf');
+      const senhaInput = document.getElementById('senha');
       const btnEntrar = document.getElementById('btnEntrar');
       const loading = document.getElementById('loading');
+      
       const cpfLimpo = cpfInput.value.replace(/\D/g, '');
+      const senha = senhaInput.value;
+      
       if (cpfLimpo.length !== 11) {
         alert('CPF inválido! Por favor, verifique e tente novamente.');
         cpfInput.classList.add('is-invalid');
         return;
       }
+      
+      if (!senha) {
+        alert('Por favor, informe sua senha!');
+        senhaInput.classList.add('is-invalid');
+        return;
+      }
+      
       cpfInput.classList.remove('is-invalid');
-      const senha = document.getElementById('senha').value;
+      senhaInput.classList.remove('is-invalid');
       btnEntrar.disabled = true;
-      btnEntrar.textContent = "Carregando...";
+      btnEntrar.classList.add('btn-loading');
+      btnEntrar.innerHTML = '<span class="invisible">Entrando...</span>';
       loading.classList.remove('d-none');
+      
       try {
         const response = await fetch('/api/auth', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ cpf: cpfLimpo, senha })
         });
-        if(response.ok) {
+        
+        if (response.ok) {
           window.location.href = `/visualiza.html?cpf=${cpfLimpo}`;
         } else {
-          alert('CPF ou senha incorretos');
-          btnEntrar.disabled = false;
-          btnEntrar.textContent = "Entrar";
-          loading.classList.add('d-none');
+          const data = await response.json();
+          alert(data.message || 'CPF ou senha incorretos');
         }
       } catch (error) {
         console.error(error);
         alert('Erro ao conectar com o servidor.');
+      } finally {
         btnEntrar.disabled = false;
+        btnEntrar.classList.remove('btn-loading');
         btnEntrar.textContent = "Entrar";
         loading.classList.add('d-none');
       }
     }
 
-  document.getElementById('formAdminLogin').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const usuario = document.getElementById('adminUsuario').value.trim();
-  const senha = document.getElementById('adminSenha').value;
-  const mensagemEl = document.getElementById('adminMensagem');
-
-  // Envia a requisição para o endpoint de autenticação administrativa
-  fetch('/api/auth/admin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ usuario, senha })
-  })
-  .then(response => {
-    if (response.ok) {
-      return response.json();
-    } else {
-      throw new Error('Usuário ou senha incorretos.');
-    }
-  })
-  .then(data => {
-    // Se a autenticação for bem-sucedida, redireciona para o painel administrativo
-    window.location.href = '/admin_dashboard.html';
-  })
-  .catch(error => {
-    console.error(error);
-    mensagemEl.innerHTML = '<div class="alert alert-danger">Usuário ou senha incorretos.</div>';
-  });
-});
-
-
-  </script>
-
-  <!-- Outros scripts do index (ex.: Recuperação de Senha) já existentes -->
-  <script>
-    // Eventos e funções já existentes para o modal de recuperação de senha
-    function formatarCPF(cpf) {
-      cpf = cpf.replace(/\D/g, '');
-      if (cpf.length > 11) cpf = cpf.slice(0, 11);
-      return cpf
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    }
-    
-    document.getElementById('novoCpf').addEventListener('input', function() {
-      this.value = formatarCPF(this.value);
-    });
-    document.getElementById('loginCpf').addEventListener('input', function() {
-      this.value = formatarCPF(this.value);
-    });
-    document.getElementById('recuperarCpf').addEventListener('input', function() {
-      this.value = formatarCPF(this.value);
-    });
-    
-    document.getElementById('recuperarNome').addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-    });
-    
-    $(document).ready(function(){
-      $("#recuperarDataNascimento").inputmask("99/99/9999");
-      $("#recuperarCelular").inputmask("(99) 99999-9999");
-    });
-    
-    async function iniciarCadastro() {
-      const cpfInput = document.getElementById('novoCpf');
-      const btnCadastrar = document.getElementById('btnCadastrar');
-      const cpfLimpo = cpfInput.value.replace(/\D/g, '');
-      if (cpfLimpo.length !== 11) {
-        alert('CPF inválido! Por favor, verifique e tente novamente.');
-        cpfInput.classList.add('is-invalid');
+    // Função para verificar dados de recuperação
+    document.getElementById('btnVerificarRecuperacao').addEventListener('click', async function() {
+      const cpf = document.getElementById('recuperarCpf').value.replace(/\D/g, '');
+      const rg = document.getElementById('recuperarRg').value;
+      const nome = document.getElementById('recuperarNome').value;
+      const dataNascimento = document.getElementById('recuperarDataNascimento').value;
+      const celular = document.getElementById('recuperarCelular').value.replace(/\D/g, '');
+      
+      // Validação básica dos campos
+      if (!cpf || cpf.length !== 11) {
+        showMessage('recuperarMensagemStep1', 'CPF inválido!', 'danger');
         return;
       }
-      cpfInput.classList.remove('is-invalid');
-      btnCadastrar.disabled = true;
-      btnCadastrar.textContent = "Verificando...";
+      if (!rg) {
+        showMessage('recuperarMensagemStep1', 'RG é obrigatório!', 'danger');
+        return;
+      }
+      if (!nome) {
+        showMessage('recuperarMensagemStep1', 'Nome é obrigatório!', 'danger');
+        return;
+      }
+      if (!dataNascimento || dataNascimento.length !== 10) {
+        showMessage('recuperarMensagemStep1', 'Data de nascimento inválida!', 'danger');
+        return;
+      }
+      if (!celular || celular.length < 11) {
+        showMessage('recuperarMensagemStep1', 'Celular inválido!', 'danger');
+        return;
+      }
+
+      const btnVerificar = this;
+      btnVerificar.disabled = true;
+      btnVerificar.classList.add('btn-loading');
+      btnVerificar.innerHTML = '<span class="invisible">Verificando...</span>';
+      
       try {
-        const response = await fetch(`/api/candidatos/check?cpf=${cpfLimpo}`);
+    const response = await fetch('/api/auth/verificar-dados-recuperacao', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        cpf,
+        rg,
+        nome,
+        dataNascimento,
+        celular
+      })
+    });
+
+    // Verifica se a resposta é JSON válido
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('Resposta não é JSON:', text);
+      throw new Error('Resposta inválida do servidor');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Erro ao verificar dados');
+    }
+    
+    // Se a verificação for bem-sucedida
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+    showMessage('recuperarMensagemStep2', 'Dados verificados com sucesso! Agora defina sua nova senha.', 'success');
+    
+  } catch (error) {
+    console.error('Erro na verificação:', error);
+    showMessage('recuperarMensagemStep1', error.message || 'Erro ao verificar dados. Tente novamente.', 'danger');
+  } finally {
+    btnVerificar.disabled = false;
+    btnVerificar.classList.remove('btn-loading');
+    btnVerificar.textContent = "Verificar Dados";
+  }
+});
+
+    // Função para redefinir senha
+    document.getElementById('formRecuperar').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const novaSenha = document.getElementById('novaSenha').value;
+      const confirmarSenha = document.getElementById('confirmarNovaSenha').value;
+      const cpf = document.getElementById('recuperarCpf').value.replace(/\D/g, '');
+      
+      if (novaSenha !== confirmarSenha) {
+        showMessage('recuperarMensagemStep2', 'As senhas não coincidem!', 'danger');
+        return;
+      }
+      if (novaSenha.length < 6) {
+        showMessage('recuperarMensagemStep2', 'A senha deve ter pelo menos 6 caracteres!', 'danger');
+        return;
+      }
+
+      const btnSubmit = document.getElementById('btnRedefinirSenha');
+      btnSubmit.disabled = true;
+      btnSubmit.classList.add('btn-loading');
+      btnSubmit.innerHTML = '<span class="invisible">Processando...</span>';
+      
+      try {
+        const response = await fetch('/api/auth/redefinir-senha', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            cpf,
+            novaSenha
+          })
+        });
+
         const data = await response.json();
-        if (data.exists) {
-          alert(data.message);
-          btnCadastrar.disabled = false;
-          btnCadastrar.textContent = "Cadastrar-se";
-          return;
+        
+        if (response.ok) {
+          showMessage('recuperarMensagemStep2', 'Senha redefinida com sucesso! Você será redirecionado.', 'success');
+          // Fecha o modal após 2 segundos
+          setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('modalRecuperar')).hide();
+            // Redireciona para a página de login
+            window.location.href = '/index.html';
+          }, 2000);
+        } else {
+          showMessage('recuperarMensagemStep2', data.message || 'Erro ao redefinir senha. Tente novamente.', 'danger');
         }
-        window.location.href = '/cadastro.html?cpf=' + cpfLimpo;
+      } catch (error) {
+        console.error('Erro na redefinição:', error);
+        showMessage('recuperarMensagemStep2', 'Erro ao conectar com o servidor. Tente novamente.', 'danger');
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove('btn-loading');
+        btnSubmit.textContent = "Redefinir Senha";
+      }
+    });
+
+    // Login administrativo
+    document.getElementById('formAdminLogin').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const usuario = document.getElementById('adminUsuario').value.trim();
+      const senha = document.getElementById('adminSenha').value;
+      const btnSubmit = this.querySelector('button[type="submit"]');
+      const mensagemEl = document.getElementById('adminMensagem');
+      
+      btnSubmit.disabled = true;
+      btnSubmit.classList.add('btn-loading');
+      btnSubmit.innerHTML = '<span class="invisible">Acessando...</span>';
+      
+      try {
+        const response = await fetch('/api/auth/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario, senha })
+        });
+        
+        if (response.ok) {
+          window.location.href = '/admin_dashboard.html';
+        } else {
+          const data = await response.json();
+          mensagemEl.innerHTML = `<div class="alert alert-danger">${data.message || 'Usuário ou senha incorretos.'}</div>`;
+        }
       } catch (error) {
         console.error(error);
-        alert('Erro ao verificar CPF. Tente novamente.');
-        btnCadastrar.disabled = false;
-        btnCadastrar.textContent = "Cadastrar-se";
+        mensagemEl.innerHTML = '<div class="alert alert-danger">Erro ao conectar com o servidor.</div>';
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove('btn-loading');
+        btnSubmit.textContent = "Acessar";
       }
+    });
+
+    // Função auxiliar para mostrar mensagens
+    function showMessage(elementId, message, type) {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+      setTimeout(() => {
+        element.innerHTML = '';
+      }, 5000);
     }
   </script>
 </body>
