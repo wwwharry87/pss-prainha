@@ -496,6 +496,21 @@
         element.innerHTML = '';
       }, 5000);
     }
+
+    // Verificar data atual
+  const dataLimite = new Date('2025-04-15T00:00:00');
+  const hoje = new Date();
+
+  if (hoje >= dataLimite) {
+    // Desativar cadastro novo
+    document.getElementById('novoCpf').disabled = true;
+    document.getElementById('btnCadastrar').disabled = true;
+    document.getElementById('btnCadastrar').textContent = 'CADASTROS ENCERRADOS';
+    
+    // Modificar mensagem na seção de cadastro
+    const cardCadastro = document.querySelector('.col-md-6:first-child .card-body');
+    cardCadastro.querySelector('p.card-text').textContent = 'O período de cadastro foi encerrado em 15/04/2025.';
+  }
   </script>
 </body>
 </html>
