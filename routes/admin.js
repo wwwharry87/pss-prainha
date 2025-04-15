@@ -360,15 +360,10 @@ router.get('/resultados-pss', async (req, res) => {
 });
 
 // Endpoint para gerar o PDF dos resultados filtrados
-// Requisitos atualizados:
-// - Exibir as informações: Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo.
-// - A Modalidade da Concorrência deverá exibir "PcD" se o campo pcd for verdadeiro e "AMPLA CONCORRÊNCIA" caso contrário.
+// Requisitos:
+// - Exibir as informações: Número de Inscrição, Nome (concatenado com " - PcD" se for verdadeiro), Data de Nascimento e Cargo.
 // - Agrupar os registros pela região.
 // - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
-// Endpoint para gerar o PDF dos resultados (ATUALIZADO)
-// Endpoint para gerar o PDF dos resultados (VERSÃO FINAL CORRIGIDA)
-// Endpoint para gerar o PDF dos resultados (VERSÃO FINAL TESTADA)
-// Endpoint para gerar o PDF corrigido
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -376,7 +371,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os dados com verificação
+    // Busca os registros na DashboardView ordenados por região e pelo nome do candidato
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -386,106 +381,106 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    console.log('Dados brutos da view:', JSON.stringify(resultados.slice(0, 2), null, 2));
-
-    // Agrupa e formata dados
+    // Agrupar os registros por região
     const grupos = {};
     resultados.forEach(candidato => {
       const reg = candidato.regiao;
-      if (!grupos[reg]) grupos[reg] = { regiao: reg, candidatos: [] };
-      
-      grupos[reg].candidatos.push({
-        ...candidato,
-        nomeFormatado: isPCD(candidato.pcd) ? `${candidato.candidato_nome} (PcD)` : candidato.candidato_nome,
-        nascimento: formatDate(candidato.data_nascimento)
+      if (!grupos[reg]) {
+        grupos[reg] = { regiao: reg, candidatos: [] };
+      }
+      grupos[reg].candidatos.push(candidato);
+    });
+
+    // Montagem do conteúdo do PDF usando pdfmake
+    const content = [];
+    content.push({ text: 'Resultado Final do PSS 001/2025', style: 'header' });
+    Object.values(grupos).forEach(grupo => {
+      // Cabeçalho do grupo: Região e total de inscritos
+      content.push({ 
+        text: `Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
+        style: 'subheader',
+        margin: [0, 10, 0, 10]
+      });
+
+      // Preparação dos dados da tabela
+      const tableBody = [];
+      // Cabeçalho da tabela
+      tableBody.push([
+        { text: 'Número de Inscrição', style: 'tableHeader' },
+        { text: 'Nome', style: 'tableHeader' },
+        { text: 'Data de Nascimento', style: 'tableHeader' },
+        { text: 'Cargo', style: 'tableHeader' }
+      ]);
+
+      // Para cada candidato, formata o nome conforme a query de teste:
+      // concatena " - PcD" se o campo pcd for verdadeiro.
+      grupo.candidatos.forEach(candidato => {
+        const nomeFormatado = candidato.candidato_nome + (isPCD(candidato.pcd) ? " - PcD" : "");
+        tableBody.push([
+          { text: candidato.inscricao_id ? candidato.inscricao_id.toString() : 'N/A', alignment: 'center' },
+          { text: nomeFormatado, alignment: 'left' },
+          { text: formatDate(candidato.data_nascimento), alignment: 'center' },
+          { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
+        ]);
+      });
+
+      content.push({
+        table: {
+          headerRows: 1,
+          widths: ['auto', '*', 'auto', '*'],
+          body: tableBody
+        },
+        layout: 'lightHorizontalLines',
+        margin: [0, 0, 0, 20]
       });
     });
 
-    // Configuração do PDF
-    const doc = new PDFDocument({ margin: 40 });
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 60],
+      content: content,
+      styles: {
+        header: {
+          fontSize: 22,
+          bold: true,
+          alignment: 'center',
+          margin: [0, 0, 0, 20]
+        },
+        subheader: {
+          fontSize: 16,
+          bold: true,
+          margin: [0, 10, 0, 10]
+        },
+        tableHeader: {
+          bold: true,
+          fontSize: 10,
+          color: 'white',
+          fillColor: '#2c3e50',
+          alignment: 'center',
+          margin: [0, 5, 0, 5]
+        }
+      },
+      defaultStyle: {
+        font: 'Helvetica'
+      }
+    };
+
+    // Configurar pdfmake para Node.js
+    const PdfPrinter = require('pdfmake');
+    const fonts = {
+      Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
+      }
+    };
+    const printer = new PdfPrinter(fonts);
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
-    doc.pipe(res);
-
-    // Cabeçalho Principal
-    doc.font('Helvetica-Bold')
-       .fontSize(16)
-       .text('RESULTADO FINAL - PSS 001/2025', { align: 'center', underline: true })
-       .moveDown(1.5);
-
-    // Loop por região
-    Object.values(grupos).forEach((grupo, index) => {
-      if (index > 0) doc.addPage(); // Nova página para cada região
-      
-      // Cabeçalho da Região
-      doc.font('Helvetica-Bold')
-         .fontSize(12)
-         .text(`REGIÃO: ${grupo.regiao.toUpperCase()} - ${grupo.candidatos.length} INSCRITOS`, { underline: true })
-         .moveDown(1);
-
-      // Configuração da tabela
-      const colunas = [
-        { header: 'INSCRIÇÃO', width: 70, align: 'center' },
-        { header: 'NOME DO CANDIDATO', width: 250, align: 'left' },
-        { header: 'DATA NASC.', width: 90, align: 'center' },
-        { header: 'CARGO', width: 180, align: 'left' }
-      ];
-
-      // Posições iniciais
-      let x = 40;
-      let y = doc.y;
-      const linhaAltura = 22;
-
-      // Desenha cabeçalho
-      doc.rect(x, y, colunas.reduce((sum, c) => sum + c.width, 0), linhaAltura)
-         .fillAndStroke('#2c3e50', '#2c3e50')
-         .fillColor('white');
-      
-      colunas.forEach((coluna, i) => {
-        doc.font('Helvetica-Bold')
-           .fontSize(10)
-           .text(coluna.header, x + 5, y + 6, { width: coluna.width - 10, align: coluna.align });
-        x += coluna.width;
-      });
-
-      // Linhas de dados
-      y += linhaAltura;
-      grupo.candidatos.forEach(candidato => {
-        x = 40;
-        
-        // Quebra página se necessário
-        if (y > doc.page.height - 50) {
-          doc.addPage();
-          y = 40;
-        }
-
-        // Conteúdo da linha
-        doc.fillColor('black')
-           .font('Helvetica')
-           .fontSize(10);
-        
-        [candidato.inscricao_id?.toString(), 
-         candidato.nomeFormatado, 
-         candidato.nascimento, 
-         candidato.cargo_nome].forEach((valor, i) => {
-          doc.text(valor || 'N/A', x + 5, y + 6, { 
-            width: colunas[i].width - 10, 
-            align: colunas[i].align,
-            lineBreak: false
-          });
-          x += colunas[i].width;
-        });
-
-        // Linha divisória
-        doc.moveTo(40, y + linhaAltura - 2)
-           .lineTo(40 + colunas.reduce((sum, c) => sum + c.width, 0), y + linhaAltura - 2)
-           .stroke('#eeeeee');
-        
-        y += linhaAltura;
-      });
-    });
-
-    doc.end();
+    pdfDoc.pipe(res);
+    pdfDoc.end();
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
     res.status(500).json({ error: "Erro ao gerar PDF", details: error.message });
