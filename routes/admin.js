@@ -10,31 +10,24 @@ const CargoRegiao = require('../models/CargoRegiao');
 const PDFDocument = require('pdfkit');
 const router = express.Router();
 
-// Helper para interpretar o valor da coluna PCD
+// Helper para interpretar o valor da coluna PCD (considerando boolean e text)
 function isPCD(val) {
-  if (val === null || val === undefined) return false;
-  return val === true || val === 'true' || val === 'TRUE' || val === 1;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') return val.toLowerCase() === 'true';
+  return false;
 }
 
-// Helper para formatar a data
-function formatDate(date) {
-  if (!date) return 'N/A';
+// Helper para formatar datas em texto 'YYYY-MM-DD'
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
   
-  // Se for string no formato YYYY-MM-DD
-  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const [year, month, day] = date.split('-');
-    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+  // Extrai componentes diretamente da string
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
   }
   
-  // Se for objeto Date
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return 'N/A';
-  
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  
-  return `${day}/${month}/${year}`;
+  return 'Data inválida';
 }
 
 // ======================================================================
@@ -375,6 +368,7 @@ router.get('/resultados-pss', async (req, res) => {
 // Endpoint para gerar o PDF dos resultados (ATUALIZADO)
 // Endpoint para gerar o PDF dos resultados (VERSÃO FINAL CORRIGIDA)
 // Endpoint para gerar o PDF dos resultados (VERSÃO FINAL TESTADA)
+// Endpoint para gerar o PDF corrigido
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -382,7 +376,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os resultados com verificação detalhada
+    // Busca os dados com verificação
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -392,169 +386,109 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // Verificação dos dados
-    console.log('Total de registros encontrados:', resultados.length);
-    if (resultados.length > 0) {
-      console.log('Exemplo de registro:', JSON.stringify({
-        id: resultados[0].inscricao_id,
-        nome: resultados[0].candidato_nome,
-        pcd: resultados[0].pcd,
-        data_nasc: resultados[0].data_nascimento,
-        tipo_pcd: typeof resultados[0].pcd,
-        tipo_data: typeof resultados[0].data_nascimento
-      }, null, 2));
-    }
+    console.log('Dados brutos da view:', JSON.stringify(resultados.slice(0, 2), null, 2));
 
-    // Agrupa por região
+    // Agrupa e formata dados
     const grupos = {};
     resultados.forEach(candidato => {
       const reg = candidato.regiao;
-      if (!grupos[reg]) {
-        grupos[reg] = {
-          regiao: reg,
-          candidatos: []
-        };
-      }
-      
-      // Concatena (PcD) ao nome se for PCD
-      const nomeCompleto = isPCD(candidato.pcd) 
-        ? `${candidato.candidato_nome} (PcD)`
-        : candidato.candidato_nome;
+      if (!grupos[reg]) grupos[reg] = { regiao: reg, candidatos: [] };
       
       grupos[reg].candidatos.push({
         ...candidato,
-        nomeCompleto: nomeCompleto,
-        dataNascimentoFormatada: formatDate(candidato.data_nascimento)
+        nomeFormatado: isPCD(candidato.pcd) ? `${candidato.candidato_nome} (PcD)` : candidato.candidato_nome,
+        nascimento: formatDate(candidato.data_nascimento)
       });
     });
 
     // Configuração do PDF
     const doc = new PDFDocument({ margin: 40 });
-    
-    // Configura os headers da resposta
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
-    
-    // Pipe do PDF para a resposta
     doc.pipe(res);
 
-    // Cabeçalho do documento
+    // Cabeçalho Principal
     doc.font('Helvetica-Bold')
        .fontSize(16)
-       .text('RESULTADO FINAL DO PROCESSO SELETIVO SIMPLIFICADO - PSS 001/2025', { 
-         align: 'center',
-         underline: true
-       })
-       .moveDown(1);
+       .text('RESULTADO FINAL - PSS 001/2025', { align: 'center', underline: true })
+       .moveDown(1.5);
 
-    // Conteúdo por região
-    Object.values(grupos).forEach(grupo => {
-      // Cabeçalho da região
+    // Loop por região
+    Object.values(grupos).forEach((grupo, index) => {
+      if (index > 0) doc.addPage(); // Nova página para cada região
+      
+      // Cabeçalho da Região
       doc.font('Helvetica-Bold')
          .fontSize(12)
-         .text(`REGIÃO: ${grupo.regiao.toUpperCase()} - TOTAL DE INSCRITOS: ${grupo.candidatos.length}`, {
-           underline: true
-         })
-         .moveDown(0.5);
+         .text(`REGIÃO: ${grupo.regiao.toUpperCase()} - ${grupo.candidatos.length} INSCRITOS`, { underline: true })
+         .moveDown(1);
 
       // Configuração da tabela
-      const startX = 40;
-      const startY = doc.y;
-      const rowHeight = 20;
-      const colWidths = [60, 250, 80, 150]; // Ajustado para 4 colunas
-      
-      // Cabeçalho da tabela
-      doc.font('Helvetica-Bold')
-         .fontSize(10)
-         .fillColor('white')
-         .rect(startX, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight)
+      const colunas = [
+        { header: 'INSCRIÇÃO', width: 70, align: 'center' },
+        { header: 'NOME DO CANDIDATO', width: 250, align: 'left' },
+        { header: 'DATA NASC.', width: 90, align: 'center' },
+        { header: 'CARGO', width: 180, align: 'left' }
+      ];
+
+      // Posições iniciais
+      let x = 40;
+      let y = doc.y;
+      const linhaAltura = 22;
+
+      // Desenha cabeçalho
+      doc.rect(x, y, colunas.reduce((sum, c) => sum + c.width, 0), linhaAltura)
          .fillAndStroke('#2c3e50', '#2c3e50')
          .fillColor('white');
       
-      let x = startX;
-      ['INSCRIÇÃO', 'NOME DO CANDIDATO', 'NASCIMENTO', 'CARGO'].forEach((header, i) => {
-        doc.text(header, x + 5, startY + 5, { 
-          width: colWidths[i], 
-          align: i === 1 ? 'left' : 'center' 
-        });
-        x += colWidths[i];
+      colunas.forEach((coluna, i) => {
+        doc.font('Helvetica-Bold')
+           .fontSize(10)
+           .text(coluna.header, x + 5, y + 6, { width: coluna.width - 10, align: coluna.align });
+        x += coluna.width;
       });
 
-      // Linhas da tabela
-      let y = startY + rowHeight;
-      
+      // Linhas de dados
+      y += linhaAltura;
       grupo.candidatos.forEach(candidato => {
-        // Linha com fundo branco
-        doc.fillColor('black')
-           .rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-           .fillAndStroke('white', '#eeeeee');
+        x = 40;
         
-        x = startX;
-        
-        // Dados da linha
-        [
-          candidato.inscricao_id?.toString() || 'N/A',
-          candidato.nomeCompleto || 'N/A',
-          candidato.dataNascimentoFormatada,
-          candidato.cargo_nome || 'N/A'
-        ].forEach((cell, i) => {
-          doc.font('Helvetica')
-             .fontSize(10)
-             .fillColor('black')
-             .text(cell, x + 5, y + 5, { 
-               width: colWidths[i] - 10, 
-               align: i === 1 ? 'left' : 'center',
-               lineBreak: false
-             });
-          x += colWidths[i];
-        });
-        
-        y += rowHeight;
-        
-        // Quebra de página se necessário
+        // Quebra página se necessário
         if (y > doc.page.height - 50) {
           doc.addPage();
           y = 40;
-          // Repete o cabeçalho em novas páginas
-          doc.font('Helvetica-Bold')
-             .fontSize(10)
-             .fillColor('white')
-             .rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-             .fillAndStroke('#2c3e50', '#2c3e50')
-             .fillColor('white');
-          
-          x = startX;
-          ['INSCRIÇÃO', 'NOME DO CANDIDATO', 'NASCIMENTO', 'CARGO'].forEach((header, i) => {
-            doc.text(header, x + 5, y + 5, { 
-              width: colWidths[i], 
-              align: i === 1 ? 'left' : 'center' 
-            });
-            x += colWidths[i];
-          });
-          
-          y += rowHeight;
         }
-      });
 
-      doc.moveDown(1.5);
+        // Conteúdo da linha
+        doc.fillColor('black')
+           .font('Helvetica')
+           .fontSize(10);
+        
+        [candidato.inscricao_id?.toString(), 
+         candidato.nomeFormatado, 
+         candidato.nascimento, 
+         candidato.cargo_nome].forEach((valor, i) => {
+          doc.text(valor || 'N/A', x + 5, y + 6, { 
+            width: colunas[i].width - 10, 
+            align: colunas[i].align,
+            lineBreak: false
+          });
+          x += colunas[i].width;
+        });
+
+        // Linha divisória
+        doc.moveTo(40, y + linhaAltura - 2)
+           .lineTo(40 + colunas.reduce((sum, c) => sum + c.width, 0), y + linhaAltura - 2)
+           .stroke('#eeeeee');
+        
+        y += linhaAltura;
+      });
     });
 
-    // Rodapé
-    doc.font('Helvetica')
-       .fontSize(10)
-       .text(`Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, {
-         align: 'right'
-       });
-
-    // Finaliza o PDF
     doc.end();
-
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ 
-      error: "Erro ao gerar PDF",
-      details: error.message 
-    });
+    res.status(500).json({ error: "Erro ao gerar PDF", details: error.message });
   }
 });
 
