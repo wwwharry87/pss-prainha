@@ -374,6 +374,7 @@ router.get('/resultados-pss', async (req, res) => {
 // - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
 // Endpoint para gerar o PDF dos resultados (ATUALIZADO)
 // Endpoint para gerar o PDF dos resultados (VERSÃO FINAL CORRIGIDA)
+// Endpoint para gerar o PDF dos resultados (VERSÃO FINAL TESTADA)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -381,7 +382,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os resultados com logging detalhado
+    // Busca os resultados com verificação detalhada
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -391,16 +392,17 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
+    // Verificação dos dados
     console.log('Total de registros encontrados:', resultados.length);
     if (resultados.length > 0) {
-      console.log('Exemplo de registro:', {
+      console.log('Exemplo de registro:', JSON.stringify({
         id: resultados[0].inscricao_id,
         nome: resultados[0].candidato_nome,
         pcd: resultados[0].pcd,
         data_nasc: resultados[0].data_nascimento,
         tipo_pcd: typeof resultados[0].pcd,
         tipo_data: typeof resultados[0].data_nascimento
-      });
+      }, null, 2));
     }
 
     // Agrupa por região
@@ -413,14 +415,21 @@ router.get('/resultados-pss/pdf', async (req, res) => {
           candidatos: []
         };
       }
+      
+      // Concatena (PcD) ao nome se for PCD
+      const nomeCompleto = isPCD(candidato.pcd) 
+        ? `${candidato.candidato_nome} (PcD)`
+        : candidato.candidato_nome;
+      
       grupos[reg].candidatos.push({
         ...candidato,
-        pcd: isPCD(candidato.pcd) // Garante que o valor PCD está correto
+        nomeCompleto: nomeCompleto,
+        dataNascimentoFormatada: formatDate(candidato.data_nascimento)
       });
     });
 
     // Configuração do PDF
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 40 });
     
     // Configura os headers da resposta
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
@@ -431,56 +440,72 @@ router.get('/resultados-pss/pdf', async (req, res) => {
 
     // Cabeçalho do documento
     doc.font('Helvetica-Bold')
-       .fontSize(18)
-       .text('Resultado Final do PSS 001/2025', { align: 'center' })
-       .moveDown(2);
+       .fontSize(16)
+       .text('RESULTADO FINAL DO PROCESSO SELETIVO SIMPLIFICADO - PSS 001/2025', { 
+         align: 'center',
+         underline: true
+       })
+       .moveDown(1);
 
     // Conteúdo por região
     Object.values(grupos).forEach(grupo => {
       // Cabeçalho da região
       doc.font('Helvetica-Bold')
-         .fontSize(14)
-         .text(`Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`)
-         .moveDown(1);
+         .fontSize(12)
+         .text(`REGIÃO: ${grupo.regiao.toUpperCase()} - TOTAL DE INSCRITOS: ${grupo.candidatos.length}`, {
+           underline: true
+         })
+         .moveDown(0.5);
 
       // Configuração da tabela
-      const startX = 50;
+      const startX = 40;
       const startY = doc.y;
       const rowHeight = 20;
-      const colWidths = [60, 200, 80, 80, 150];
+      const colWidths = [60, 250, 80, 150]; // Ajustado para 4 colunas
       
       // Cabeçalho da tabela
       doc.font('Helvetica-Bold')
          .fontSize(10)
          .fillColor('white')
          .rect(startX, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-         .fillAndStroke('#3498db', '#3498db')
+         .fillAndStroke('#2c3e50', '#2c3e50')
          .fillColor('white');
       
       let x = startX;
-      ['Inscrição', 'Nome', 'Modalidade', 'Nascimento', 'Cargo'].forEach((header, i) => {
-        doc.text(header, x + 5, startY + 5, { width: colWidths[i], align: 'left' });
+      ['INSCRIÇÃO', 'NOME DO CANDIDATO', 'NASCIMENTO', 'CARGO'].forEach((header, i) => {
+        doc.text(header, x + 5, startY + 5, { 
+          width: colWidths[i], 
+          align: i === 1 ? 'left' : 'center' 
+        });
         x += colWidths[i];
       });
 
       // Linhas da tabela
       let y = startY + rowHeight;
+      
       grupo.candidatos.forEach(candidato => {
-        doc.font('Helvetica')
-           .fontSize(10)
-           .fillColor('black')
+        // Linha com fundo branco
+        doc.fillColor('black')
            .rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-           .stroke('#dddddd');
+           .fillAndStroke('white', '#eeeeee');
         
         x = startX;
+        
+        // Dados da linha
         [
           candidato.inscricao_id?.toString() || 'N/A',
-          candidato.candidato_nome || 'N/A',
-          candidato.pcd ? "PcD" : "Ampla",
-          formatDate(candidato.data_nascimento),
+          candidato.nomeCompleto || 'N/A',
+          candidato.dataNascimentoFormatada,
           candidato.cargo_nome || 'N/A'
         ].forEach((cell, i) => {
-          doc.text(cell, x + 5, y + 5, { width: colWidths[i] - 10, align: i === 1 ? 'left' : 'center' });
+          doc.font('Helvetica')
+             .fontSize(10)
+             .fillColor('black')
+             .text(cell, x + 5, y + 5, { 
+               width: colWidths[i] - 10, 
+               align: i === 1 ? 'left' : 'center',
+               lineBreak: false
+             });
           x += colWidths[i];
         });
         
@@ -489,12 +514,37 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         // Quebra de página se necessário
         if (y > doc.page.height - 50) {
           doc.addPage();
-          y = 50;
+          y = 40;
+          // Repete o cabeçalho em novas páginas
+          doc.font('Helvetica-Bold')
+             .fontSize(10)
+             .fillColor('white')
+             .rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
+             .fillAndStroke('#2c3e50', '#2c3e50')
+             .fillColor('white');
+          
+          x = startX;
+          ['INSCRIÇÃO', 'NOME DO CANDIDATO', 'NASCIMENTO', 'CARGO'].forEach((header, i) => {
+            doc.text(header, x + 5, y + 5, { 
+              width: colWidths[i], 
+              align: i === 1 ? 'left' : 'center' 
+            });
+            x += colWidths[i];
+          });
+          
+          y += rowHeight;
         }
       });
 
-      doc.moveDown(2);
+      doc.moveDown(1.5);
     });
+
+    // Rodapé
+    doc.font('Helvetica')
+       .fontSize(10)
+       .text(`Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, {
+         align: 'right'
+       });
 
     // Finaliza o PDF
     doc.end();
