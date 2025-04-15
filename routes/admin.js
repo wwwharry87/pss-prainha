@@ -13,10 +13,11 @@ const router = express.Router();
 
 // Helper para interpretar o valor da coluna PCD
 function isPCD(val) {
+  // Considera true se o valor for boolean true ou string "true" (case insensitive)
   return val === true || (typeof val === 'string' && val.toLowerCase() === 'true');
 }
 
-// Helper para formatar data (data de nascimento)
+// Helper para formatar a data (ex.: data de nascimento) no padrão dd/mm/aaaa
 function formatDate(date) {
   if (!date) return '';
   const d = new Date(date);
@@ -356,8 +357,9 @@ router.get('/resultados-pss', async (req, res) => {
 // Endpoint para gerar o PDF dos resultados filtrados
 // Requisitos atualizados:
 // - Exibir as informações: Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo.
+// - A Modalidade da Concorrência deverá exibir "PcD" se o campo pcd for verdadeiro e "AMPLA CONCORRÊNCIA" caso contrário.
 // - Agrupar os registros pela região.
-// - No cabeçalho de cada grupo, exibir o total de inscritos daquela região.
+// - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -398,7 +400,8 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         style: 'subheader' 
       });
 
-      // Construção da tabela com as colunas: Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo
+      // Construção da tabela com as colunas:
+      // Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo
       const tableBody = [];
       tableBody.push([
         { text: 'Número de Inscrição', style: 'tableHeader' },
@@ -412,7 +415,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         tableBody.push([
           candidato.inscricao_id ? candidato.inscricao_id.toString() : '',
           candidato.candidato_nome,
-          candidato.modalidade || '',
+          isPCD(candidato.pcd) ? "PcD" : "AMPLA CONCORRÊNCIA",
           formatDate(candidato.data_nascimento),
           candidato.cargo_nome
         ]);
