@@ -13,17 +13,25 @@ const router = express.Router();
 
 // Helper para interpretar o valor da coluna PCD
 function isPCD(val) {
-  // Considera true se o valor for boolean true ou string "true" (case insensitive)
   return val === true || (typeof val === 'string' && val.toLowerCase() === 'true');
 }
 
-// Helper para formatar a data (ex.: data de nascimento) no padrão dd/mm/aaaa
+// Helper para formatar a data (agora com suporte a strings YYYY-MM-DD)
 function formatDate(date) {
-  if (!date) return '';
+  if (!date) return 'N/A';
+  
+  // Se for string no formato YYYY-MM-DD
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = date.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Se for objeto Date
   const d = new Date(date);
-  if (isNaN(d)) return '';
+  if (isNaN(d)) return 'N/A';
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+
 
 // ======================================================================
 // 1. Endpoints já existentes (Dashboard, Inscrições, Candidato, etc.)
