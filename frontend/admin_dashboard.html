@@ -690,12 +690,27 @@
       // Configura eventos dos filtros e botão PDF
       $('#btnFiltrar').click(loadResultados);
 
-      document.getElementById('btnGeneratePDF').addEventListener('click', () => {
-        const cargoSelecionado = $('#filterCargo').val() || '';
-        const regiaoSelecionada = $('#filterRegiao').val() || '';
-        let url = `/api/admin/resultados-pss/pdf?cargo=${encodeURIComponent(cargoSelecionado)}&regiao=${encodeURIComponent(regiaoSelecionada)}`;
-        window.open(url, '_blank');
-      });
+      // No seu script do HTML, atualize o evento do botão PDF:
+document.getElementById('btnGeneratePDF').addEventListener('click', async () => {
+  const cargoSelecionado = $('#filterCargo').val() || '';
+  const regiaoSelecionada = $('#filterRegiao').val() || '';
+  
+  try {
+    // Mostra loading
+    $('#btnGeneratePDF').html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Gerando...');
+    
+    // Abre em nova aba
+    let url = `/api/admin/resultados-pss/pdf?cargo=${encodeURIComponent(cargoSelecionado)}&regiao=${encodeURIComponent(regiaoSelecionada)}`;
+    window.open(url, '_blank');
+    
+  } catch (error) {
+    console.error('Erro ao gerar PDF:', error);
+    alert('Erro ao gerar PDF: ' + error.message);
+  } finally {
+    // Restaura o botão
+    $('#btnGeneratePDF').text('Gerar PDF');
+  }
+});
 
       function setupEventListeners() {
         $('#refreshBtn').click(loadDashboardData);

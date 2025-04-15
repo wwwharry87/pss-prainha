@@ -373,6 +373,7 @@ router.get('/resultados-pss', async (req, res) => {
 // - Agrupar os registros pela região.
 // - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
 // Endpoint para gerar o PDF dos resultados (ATUALIZADO)
+// Endpoint para gerar o PDF dos resultados (VERSÃO FINAL CORRIGIDA)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -380,7 +381,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os resultados incluindo os dados brutos para debug
+    // Busca os resultados com logging detalhado
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -390,13 +391,14 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // Verificação dos dados
+    console.log('Total de registros encontrados:', resultados.length);
     if (resultados.length > 0) {
-      console.log('Dados do primeiro candidato:', {
+      console.log('Exemplo de registro:', {
+        id: resultados[0].inscricao_id,
         nome: resultados[0].candidato_nome,
         pcd: resultados[0].pcd,
-        tipo_pcd: typeof resultados[0].pcd,
         data_nasc: resultados[0].data_nascimento,
+        tipo_pcd: typeof resultados[0].pcd,
         tipo_data: typeof resultados[0].data_nascimento
       });
     }
@@ -411,106 +413,91 @@ router.get('/resultados-pss/pdf', async (req, res) => {
           candidatos: []
         };
       }
-      grupos[reg].candidatos.push(candidato);
+      grupos[reg].candidatos.push({
+        ...candidato,
+        pcd: isPCD(candidato.pcd) // Garante que o valor PCD está correto
+      });
     });
 
-    // Configuração do documento PDF
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'portrait',
-      pageMargins: [40, 60, 40, 60],
-      content: [
-        { 
-          text: 'Resultado Final do PSS 001/2025', 
-          style: 'header',
-          margin: [0, 0, 0, 20]
-        },
-        ...Object.values(grupos).map(grupo => ({
-          stack: [
-            { 
-              text: `Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`,
-              style: 'subheader',
-              margin: [0, 0, 0, 10]
-            },
-            {
-              table: {
-                headerRows: 1,
-                widths: [60, '*', 70, 80, '*'],
-                body: [
-                  [
-                    { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
-                    { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
-                    { text: 'Modalidade', style: 'tableHeader', alignment: 'center' },
-                    { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
-                    { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
-                  ],
-                  ...grupo.candidatos.map(candidato => [
-                    { text: candidato.inscricao_id?.toString() || 'N/A', alignment: 'center' },
-                    { text: candidato.candidato_nome || 'N/A', alignment: 'left' },
-                    { text: isPCD(candidato.pcd) ? "PcD" : "Ampla", alignment: 'center' },
-                    { text: formatDate(candidato.data_nascimento), alignment: 'center' },
-                    { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
-                  ])
-                ]
-              },
-              layout: {
-                hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-                vLineWidth: () => 0.5,
-                hLineColor: () => '#aaaaaa',
-                vLineColor: () => '#aaaaaa',
-                paddingTop: (i) => i === 0 ? 5 : 3,
-                paddingBottom: (i, node) => (i === node.table.body.length - 1) ? 5 : 3
-              },
-              margin: [0, 0, 0, 20]
-            }
-          ]
-        }))
-      ],
-      styles: {
-        header: {
-          fontSize: 18,
-          bold: true,
-          alignment: 'center',
-          color: '#2c3e50'
-        },
-        subheader: {
-          fontSize: 14,
-          bold: true,
-          color: '#34495e',
-          margin: [0, 5, 0, 5]
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 10,
-          color: '#ffffff',
-          fillColor: '#3498db',
-          margin: [0, 2, 0, 2]
-        }
-      },
-      defaultStyle: {
-        font: 'Helvetica',
-        fontSize: 10
-      }
-    };
-
-    // Criação do PDF
-    const PdfPrinter = require('pdfmake');
-    const fonts = {
-      Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
-      }
-    };
-
-    const printer = new PdfPrinter(fonts);
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-
+    // Configuração do PDF
+    const doc = new PDFDocument();
+    
+    // Configura os headers da resposta
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
-    pdfDoc.pipe(res);
-    pdfDoc.end();
+    
+    // Pipe do PDF para a resposta
+    doc.pipe(res);
+
+    // Cabeçalho do documento
+    doc.font('Helvetica-Bold')
+       .fontSize(18)
+       .text('Resultado Final do PSS 001/2025', { align: 'center' })
+       .moveDown(2);
+
+    // Conteúdo por região
+    Object.values(grupos).forEach(grupo => {
+      // Cabeçalho da região
+      doc.font('Helvetica-Bold')
+         .fontSize(14)
+         .text(`Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`)
+         .moveDown(1);
+
+      // Configuração da tabela
+      const startX = 50;
+      const startY = doc.y;
+      const rowHeight = 20;
+      const colWidths = [60, 200, 80, 80, 150];
+      
+      // Cabeçalho da tabela
+      doc.font('Helvetica-Bold')
+         .fontSize(10)
+         .fillColor('white')
+         .rect(startX, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight)
+         .fillAndStroke('#3498db', '#3498db')
+         .fillColor('white');
+      
+      let x = startX;
+      ['Inscrição', 'Nome', 'Modalidade', 'Nascimento', 'Cargo'].forEach((header, i) => {
+        doc.text(header, x + 5, startY + 5, { width: colWidths[i], align: 'left' });
+        x += colWidths[i];
+      });
+
+      // Linhas da tabela
+      let y = startY + rowHeight;
+      grupo.candidatos.forEach(candidato => {
+        doc.font('Helvetica')
+           .fontSize(10)
+           .fillColor('black')
+           .rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight)
+           .stroke('#dddddd');
+        
+        x = startX;
+        [
+          candidato.inscricao_id?.toString() || 'N/A',
+          candidato.candidato_nome || 'N/A',
+          candidato.pcd ? "PcD" : "Ampla",
+          formatDate(candidato.data_nascimento),
+          candidato.cargo_nome || 'N/A'
+        ].forEach((cell, i) => {
+          doc.text(cell, x + 5, y + 5, { width: colWidths[i] - 10, align: i === 1 ? 'left' : 'center' });
+          x += colWidths[i];
+        });
+        
+        y += rowHeight;
+        
+        // Quebra de página se necessário
+        if (y > doc.page.height - 50) {
+          doc.addPage();
+          y = 50;
+        }
+      });
+
+      doc.moveDown(2);
+    });
+
+    // Finaliza o PDF
+    doc.end();
 
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
