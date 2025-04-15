@@ -337,7 +337,6 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
-// Endpoint para gerar o PDF dos resultados filtrados
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -345,108 +344,9 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
+    // Buscando resultados na DashboardView ordenados por cargo e região (ordem alfabética)
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
-      order: [
-        ['cargo_nome', 'ASC'],
-        ['regiao', 'ASC'],
-        ['pontuacao', 'DESC']
-      ],
-      raw: true
-    });
-
-    // Agrupar os resultados por cargo e região
-    const grupos = {};
-    resultados.forEach(candidato => {
-      const chave = `${candidato.cargo_nome}|${candidato.regiao}`;
-      if (!grupos[chave]) {
-        grupos[chave] = {
-          cargo: candidato.cargo_nome,
-          regiao: candidato.regiao,
-          candidatos: []
-        };
-      }
-      grupos[chave].candidatos.push(candidato);
-    });
-
-    // Buscar as vagas disponíveis
-    const vagas = await CargoRegiao.findAll({
-      include: [{
-        model: Cargo,
-        as: 'cargo',
-        attributes: ['nome']
-      }],
-      raw: true,
-      nest: true
-    });
-
-    const resultadoFinal = Object.values(grupos).map(grupo => {
-      const vaga = vagas.find(v =>
-        v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
-      );
-      const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
-      const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
-      grupo.candidatos = grupo.candidatos.map((candidato, index) => {
-        let situacao = 'Não Classificado';
-        if (index < vagas_imediatas) {
-          situacao = 'Classificado';
-        } else if (candidato.pcd && index < (vagas_imediatas + reserva_pcd)) {
-          situacao = 'Classificado (Reserva PCD)';
-        }
-        return {
-          ...candidato,
-          classificacao: index + 1,
-          situacao
-        };
-      });
-      return {
-        ...grupo,
-        vagas_imediatas,
-        reserva_pcd
-      };
-    });
-
-    // Gerar o PDF com PDFKit
-    const doc = new PDFDocument();
-    res.setHeader('Content-Disposition', 'attachment; filename="resultados.pdf"');
-    res.setHeader('Content-Type', 'application/pdf');
-    doc.pipe(res);
-
-    doc.fontSize(18).text("Resultado Final do PSS 001/2025", { align: 'center' });
-    doc.moveDown();
-
-    resultadoFinal.forEach(grupo => {
-      doc.fontSize(14).text(`Cargo: ${grupo.cargo} | Região: ${grupo.regiao}`);
-      doc.fontSize(12).text(`Vagas Imediatas: ${grupo.vagas_imediatas} | Reserva PCD: ${grupo.reserva_pcd}`);
-      doc.moveDown(0.5);
-      grupo.candidatos.forEach(candidato => {
-        doc.fontSize(10).text(
-          `${candidato.classificacao}º - ${candidato.candidato_nome} - Pontuação: ${candidato.pontuacao} - Situação: ${candidato.situacao}`
-        );
-      });
-      doc.moveDown();
-      doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-      doc.moveDown();
-    });
-
-    doc.end();
-  } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Endpoint para gerar o PDF dos resultados filtrados usando pdfmake
-router.get('/resultados-pss/pdf', async (req, res) => {
-  try {
-    const { cargo, regiao } = req.query;
-    const whereDashboard = { status: 'PENDENTE' };
-    if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
-    if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
-
-    const resultados = await DashboardView.findAll({
-      where: whereDashboard,
-      // Removemos a ordenação por pontuação para que possamos ordenar alfabeticamente
       order: [
         ['cargo_nome', 'ASC'],
         ['regiao', 'ASC']
@@ -479,37 +379,23 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       nest: true
     });
 
-    // Para cada grupo: junta informações de vagas, ordena os candidatos pelo nome
-    // e anexa " (PcD)" ao nome dos candidatos que são PcD.
+    // Processar cada grupo: ordenar os candidatos alfabeticamente e atribuir a classificação
     const resultadoFinal = Object.values(grupos).map(grupo => {
+      // Procura a vaga que corresponda ao cargo e região
       const vaga = vagas.find(v =>
         v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
       );
       const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
-      // A coluna reserva_pcd é boolean; se true, consideramos 1 vaga reservada
       const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
+
       // Ordena os candidatos alfabeticamente pelo nome
       grupo.candidatos.sort((a, b) => a.candidato_nome.localeCompare(b.candidato_nome));
+
+      // Atribui a classificação (índice + 1)
       grupo.candidatos = grupo.candidatos.map((candidato, index) => {
-        let nome = candidato.candidato_nome;
-        if (candidato.pcd) {
-          // Anexa " (PcD)" caso ainda não esteja no nome
-          if (!nome.includes("(PcD)")) {
-            nome += " (PcD)";
-          }
-        }
-        // Remove a coluna pontuação (não será utilizada no PDF) e atribui a classificação
-        let situacao = 'Não Classificado';
-        if (index < vagas_imediatas) {
-          situacao = 'Classificado';
-        } else if (candidato.pcd && index < (vagas_imediatas + reserva_pcd)) {
-          situacao = 'Classificado (Reserva PCD)';
-        }
         return {
           ...candidato,
-          candidato_nome: nome,
-          classificacao: index + 1,
-          situacao
+          classificacao: index + 1
         };
       });
       return {
@@ -529,29 +415,29 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         style: 'subheader',
         margin: [0, 0, 0, 10]
       });
-      
-      // Cria a tabela para os candidatos (removida a coluna de Pontuação)
+
+      // Construção da tabela para os candidatos – sem as colunas de pontuação e situação.
       const tableBody = [];
+      // Cabeçalho da tabela: Classificação, Nome e CPF
       tableBody.push([
         { text: 'Class.', style: 'tableHeader' },
         { text: 'Nome', style: 'tableHeader' },
-        { text: 'CPF', style: 'tableHeader' },
-        { text: 'Situação', style: 'tableHeader' }
+        { text: 'CPF', style: 'tableHeader' }
       ]);
-      
+
       grupo.candidatos.forEach(candidato => {
         tableBody.push([
           candidato.classificacao.toString(),
           candidato.candidato_nome,
-          candidato.candidato_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
-          candidato.situacao
+          // Exibe o CPF no formato: 000.XXX.XXX-91
+          candidato.candidato_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.XXX.XXX-$4')
         ]);
       });
-      
+
       content.push({
         table: {
           headerRows: 1,
-          widths: ['auto', '*', 'auto', '*'],
+          widths: ['auto', '*', 'auto'],
           body: tableBody
         },
         layout: 'lightHorizontalLines',
@@ -584,10 +470,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
           fillColor: '#2980b9',
           alignment: 'center',
           margin: [0, 5, 0, 5]
-        },
-        tableData: {
-          fontSize: 10,
-          margin: [0, 5, 0, 5]
         }
       },
       defaultStyle: {
@@ -617,6 +499,5 @@ router.get('/resultados-pss/pdf', async (req, res) => {
   }
 });
 
-module.exports = router;
 
 
