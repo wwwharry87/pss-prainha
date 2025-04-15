@@ -8,7 +8,7 @@ const Candidato = require('../models/Candidato');
 const ValidacaoInscricao = require('../models/ValidacaoInscricao');
 const CargoRegiao = require('../models/CargoRegiao'); // Modelo para a tabela cargo_regioes
 
-const PDFDocument = require('pdfkit'); // Biblioteca para gerar PDF
+const PDFDocument = require('pdfkit'); // Biblioteca para gerar PDF (usada em outros endpoints, se necessário)
 
 const router = express.Router();
 
@@ -179,53 +179,53 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
     let pontuacaoFinal = 0;
     
     // Campos fixos
-    if(validacoes["doc_escolaridade_path"] === "confirmado") {
+    if (validacoes["doc_escolaridade_path"] === "confirmado") {
       pontuacaoFinal += 50;
     }
-    if(validacoes["doc_certificado_fundamental_path"] === "confirmado") {
+    if (validacoes["doc_certificado_fundamental_path"] === "confirmado") {
       pontuacaoFinal += 10;
     }
-    if(validacoes["doc_certificado_medio_path"] === "confirmado") {
+    if (validacoes["doc_certificado_medio_path"] === "confirmado") {
       pontuacaoFinal += 10;
     }
-    if(validacoes["doc_certificado_fund_completo_path"] === "confirmado") {
+    if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") {
       pontuacaoFinal += 10;
     }
     
     // Tempo de Exercício
-    if(validacoes["doc_tempo_exercicio_path"]) {
+    if (validacoes["doc_tempo_exercicio_path"]) {
       const tempoPoints = { "ate02": 5, "de02a04": 10, "de04a06": 15, "mais06": 20 };
-      pontuacaoFinal += tempoPoints[ validacoes["doc_tempo_exercicio_path"] ] || 0;
+      pontuacaoFinal += tempoPoints[validacoes["doc_tempo_exercicio_path"]] || 0;
     }
     
     // Para cargos de Nível FUNDAMENTAL: doc_cursos (limite 4)
-    if(cargo && cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && validacoes["doc_cursos"] === "confirmado") {
+    if (cargo && cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && validacoes["doc_cursos"] === "confirmado") {
       try {
         const cursos = JSON.parse(inscricao.doc_cursos);
         let count = Math.min(cursos.length, 4);
         pontuacaoFinal += count * 5;
-      } catch(e) {
+      } catch (e) {
         console.error("Erro ao parsear doc_cursos", e);
       }
     }
     
     // Para cargos de Nível SUPERIOR: doc_pos e doc_qualificacao (limite 2 cada)
-    if(cargo && cargo.nivel.toUpperCase().includes("SUPERIOR")) {
-      if(validacoes["doc_pos"] === "confirmado") {
+    if (cargo && cargo.nivel.toUpperCase().includes("SUPERIOR")) {
+      if (validacoes["doc_pos"] === "confirmado") {
         try {
           const pos = JSON.parse(inscricao.doc_pos);
           let count = Math.min(pos.length, 2);
           pontuacaoFinal += count * 5;
-        } catch(e) {
+        } catch (e) {
           console.error("Erro ao parsear doc_pos", e);
         }
       }
-      if(validacoes["doc_qualificacao"] === "confirmado") {
+      if (validacoes["doc_qualificacao"] === "confirmado") {
         try {
           const qual = JSON.parse(inscricao.doc_qualificacao);
           let count = Math.min(qual.length, 2);
           pontuacaoFinal += count * 5;
-        } catch(e) {
+        } catch (e) {
           console.error("Erro ao parsear doc_qualificacao", e);
         }
       }
@@ -337,6 +337,12 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
+// Endpoint para gerar o PDF dos resultados filtrados
+// Novos requisitos:
+// - Agrupar por região e cargo (ordenado alfabeticamente)
+// - Exibir no PDF somente: NOME concatenado com "(PcD)" se aplicável, ID INSCRIÇÃO e SITUACAO (fixa "CLASSIFICADO")
+// - Excluir a coluna de ordem/classificação
+// - No cabeçalho de cada grupo, incluir o total de inscritos na respectiva região (do grupo)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -379,65 +385,50 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       nest: true
     });
 
-    // Processar cada grupo: ordenar os candidatos alfabeticamente e atribuir a classificação
+    // Processar cada grupo: ordenar os candidatos alfabeticamente pelo nome
     const resultadoFinal = Object.values(grupos).map(grupo => {
-      // Procura a vaga que corresponda ao cargo e região
-      const vaga = vagas.find(v =>
-        v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
-      );
-      const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
-      const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
-
       // Ordena os candidatos alfabeticamente pelo nome
       grupo.candidatos.sort((a, b) => a.candidato_nome.localeCompare(b.candidato_nome));
-
-      // Atribui a classificação (índice + 1)
-      grupo.candidatos = grupo.candidatos.map((candidato, index) => {
-        return {
-          ...candidato,
-          classificacao: index + 1
-        };
-      });
-      return {
-        ...grupo,
-        vagas_imediatas,
-        reserva_pcd
-      };
+      return grupo;
     });
 
-    // Construindo o docDefinition para o pdfmake com estilos aprimorados
+    // Montando o conteúdo do PDF utilizando pdfmake
     const content = [];
     content.push({ text: 'Resultado Final do PSS 001/2025', style: 'header' });
     resultadoFinal.forEach(grupo => {
-      content.push({ text: `Cargo: ${grupo.cargo} | Região: ${grupo.regiao}`, style: 'subheader' });
-      content.push({
-        text: `Vagas Imediatas: ${grupo.vagas_imediatas}  |  Reserva PCD: ${grupo.reserva_pcd}`,
-        style: 'subheader',
-        margin: [0, 0, 0, 10]
+      // Cabeçalho do grupo: cargo, região e total de inscritos
+      content.push({ 
+        text: `Cargo: ${grupo.cargo} | Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
+        style: 'subheader' 
       });
 
-      // Construção da tabela para os candidatos – sem as colunas de pontuação e situação.
+      // Construção da tabela com as colunas: Nome, ID Inscrição, Situação
       const tableBody = [];
-      // Cabeçalho da tabela: Classificação, Nome e CPF
       tableBody.push([
-        { text: 'Class.', style: 'tableHeader' },
         { text: 'Nome', style: 'tableHeader' },
-        { text: 'CPF', style: 'tableHeader' }
+        { text: 'ID Inscrição', style: 'tableHeader' },
+        { text: 'Situação', style: 'tableHeader' }
       ]);
 
       grupo.candidatos.forEach(candidato => {
+        // Concatena "(PcD)" ao nome se o candidato tiver pcd verdadeiro
+        let nomeCompleto = candidato.candidato_nome;
+        if (candidato.pcd) {
+          if (!nomeCompleto.includes("(PcD)")) {
+            nomeCompleto += " (PcD)";
+          }
+        }
         tableBody.push([
-          candidato.classificacao.toString(),
-          candidato.candidato_nome,
-          // Exibe o CPF no formato: 000.XXX.XXX-91
-          candidato.candidato_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.XXX.XXX-$4')
+          nomeCompleto,
+          candidato.inscricao_id ? candidato.inscricao_id.toString() : '',
+          'CLASSIFICADO'
         ]);
       });
 
       content.push({
         table: {
           headerRows: 1,
-          widths: ['auto', '*', 'auto'],
+          widths: ['*', 'auto', 'auto'],
           body: tableBody
         },
         layout: 'lightHorizontalLines',
@@ -499,5 +490,4 @@ router.get('/resultados-pss/pdf', async (req, res) => {
   }
 });
 
-
-
+module.exports = router;
