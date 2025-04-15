@@ -5,15 +5,15 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta http-equiv="Content-Security-Policy" content="
-  default-src 'self' https://pss-prainha.onrender.com; 
-  script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline'; 
-  script-src-elem 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
-  style-src 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
-  style-src-elem 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
-  img-src 'self' data: https://*; 
-  font-src 'self' https://cdn.jsdelivr.net; 
-  connect-src 'self' https://pss-prainha.onrender.com https://viacep.com.br https://cdn.datatables.net; 
-  frame-src 'self'">
+    default-src 'self' https://pss-prainha.onrender.com;
+    script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    script-src-elem 'self' https://code.jquery.com https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    style-src 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    style-src-elem 'self' https://cdn.jsdelivr.net https://cdn.datatables.net 'unsafe-inline';
+    img-src 'self' data: https://*;
+    font-src 'self' https://cdn.jsdelivr.net;
+    connect-src 'self' https://pss-prainha.onrender.com https://viacep.com.br https://cdn.datatables.net;
+    frame-src 'self'">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel Administrativo</title>
@@ -24,7 +24,7 @@
     :root {
       --sidebar-width: 250px;
     }
-    body { 
+    body {
       background-color: #f8f9fa;
       padding-top: 56px;
     }
@@ -72,37 +72,54 @@
       border: 1px solid #dee2e6;
       border-radius: 5px;
     }
-    /* Remova ou comente o overflow-x definido pelos estilos padrão da classe table-responsive */
-.table-responsive {
-  height: 100%; /* se necessário, ajuste a altura */
-  overflow-y: auto;
-  overflow-x: hidden;   /* impede o scroll horizontal */
-  width: 100%;          /* força a largura 100% */
-}
-
-
-/* Ajusta a fonte dos dados da tabela */
-.table {
-  font-family: 'Arial', sans-serif; /* ou outra família que você preferir */
-  font-size: 12px;  /* ajuste o tamanho da fonte conforme necessário */
-  color: #333;      /* cor do texto */
-}
-
-/* Opcional: ajuste a fonte nos cabeçalhos da tabela */
-.table thead th {
-  font-family: 'Arial', sans-serif;
-  font-size: 14px; /* pode ser maior para destacar */
-  font-weight: bold;
-  color: #000;
-}
-
-
-
-/* Força a tabela a ocupar 100% da largura do container */
-.table {
-  width: 100% !important;
-}
-
+    .table-responsive {
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      width: 100%;
+    }
+    .table {
+      font-family: 'Arial', sans-serif;
+      font-size: 12px;
+      color: #333;
+      width: 100% !important;
+    }
+    .table thead th {
+      font-family: 'Arial', sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      color: #000;
+    }
+    /* Estilos para a seção de resultados */
+    .table-resultados {
+      font-size: 14px;
+    }
+    .table-resultados thead th {
+      background-color: #343a40;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+    .table-resultados tbody tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    .table-resultados .classificado {
+      background-color: #e6f7e6;
+    }
+    .table-resultados .nao-classificado {
+      background-color: #ffe6e6;
+    }
+    .resultado-cargo {
+      margin-bottom: 30px;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .resultado-header {
+      background-color: #f8f9fa;
+      padding: 10px 15px;
+      border-bottom: 1px solid #dee2e6;
+    }
   </style>
 </head>
 <body>
@@ -117,10 +134,9 @@
         <button class="btn btn-outline-light me-2" id="refreshBtn">
           <i class="bi bi-arrow-clockwise"></i> Atualizar
         </button>
-        <!-- Botão de Logout, agora chama a função logout() -->
         <button class="btn btn-danger" id="logoutBtn">
-            <i class="bi bi-box-arrow-right"></i> Sair
-          </button>
+          <i class="bi bi-box-arrow-right"></i> Sair
+        </button>
       </div>
     </div>
   </nav>
@@ -128,7 +144,6 @@
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
     <div class="p-3">
-      <!-- Busca global (dashboard) -->
       <div class="input-group mb-3">
         <input type="text" class="form-control form-control-sm" placeholder="Buscar candidato..." id="searchInput">
         <button class="btn btn-primary btn-sm" type="button" id="searchBtn">
@@ -147,7 +162,16 @@
           <i class="bi bi-list-check me-2"></i>Inscrições
         </a>
       </li>
-      <!-- A opção de Validação está desabilitada -->
+      <li class="nav-item">
+        <a class="nav-link" href="admin_validacao.html">
+          <i class="bi bi-check2-square me-2"></i>Validação
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-section="resultados">
+          <i class="bi bi-trophy me-2"></i>Resultados
+        </a>
+      </li>
     </ul>
   </div>
 
@@ -156,7 +180,7 @@
     <div class="container-fluid p-4">
       <!-- Dashboard Section -->
       <div id="dashboardSection">
-        <!-- Resumo -->
+        <!-- Resumo e gráficos (conforme seu código existente) -->
         <div class="row mb-4">
           <div class="col-md-4">
             <div class="card card-dashboard bg-primary text-white">
@@ -225,7 +249,7 @@
         </div>
       </div>
 
-      <!-- Seção de Inscrições -->
+      <!-- Inscrições Section -->
       <div id="inscricoesSection" style="display: none;">
         <div class="card card-dashboard">
           <div class="card-body">
@@ -258,7 +282,41 @@
           </div>
         </div>
       </div>
-      <!-- A seção de Validação permanece desabilitada -->
+
+      <!-- Resultados Section (com filtros e botão para PDF) -->
+      <div id="resultadosSection" style="display: none;">
+        <div class="card card-dashboard">
+          <div class="card-body">
+            <h5 class="card-title mb-4">Resultado Final do PSS 001/2025</h5>
+            <!-- Controles para filtro e PDF -->
+            <div class="d-flex justify-content-end mb-3">
+              <select id="filterCargo" class="form-select form-select-sm mx-1" style="width: 200px;">
+                <option value="">Todos os Cargos</option>
+                <option value="Professor">Professor</option>
+                <option value="Auxiliar">Auxiliar</option>
+                <!-- Outras opções, se necessário -->
+              </select>
+              <select id="filterRegiao" class="form-select form-select-sm mx-1" style="width: 200px;">
+                <option value="">Todas as Regiões</option>
+                <option value="Zona Norte">Zona Norte</option>
+                <option value="Zona Sul">Zona Sul</option>
+                <!-- Outras opções, se necessário -->
+              </select>
+              <button id="btnFiltrar" class="btn btn-primary btn-sm mx-1">Filtrar</button>
+              <button id="btnGeneratePDF" class="btn btn-secondary btn-sm mx-1">Gerar PDF</button>
+            </div>
+            <div id="resultadosContainer">
+              <div class="text-center my-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2">Carregando resultados...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -309,14 +367,11 @@
   <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <script>
-    // Variável global para armazenar o total de inscritos
     window.totalInscritosGlobal = 0;
+    let cargoChart, regiaoChart, inscricoesTable;
 
     document.addEventListener('DOMContentLoaded', function() {
-      let cargoChart, regiaoChart, inscricoesTable;
-
       $(document).ready(function() {
         initSidebar();
         loadDashboardData();
@@ -324,34 +379,30 @@
         setupEventListeners();
       });
 
-      // Função de Logout: limpa localStorage, sessionStorage e força redirecionamento sem possibilidade de retorno
       document.getElementById('logoutBtn').addEventListener('click', function() {
-      sessionStorage.clear();
-      localStorage.clear();
-      window.location.replace('/index.html');
-    });
+        sessionStorage.clear();
+        localStorage.clear();
+        window.location.replace('/index.html');
+      });
 
-      // Sidebar
       function initSidebar() {
         $('#sidebarToggle').click(function() {
           $('#sidebar').toggleClass('collapsed');
           $('#mainContent').toggleClass('expanded');
         });
-
         $('[data-section]').click(function(e) {
           e.preventDefault();
           const section = $(this).data('section');
           $('[data-section]').removeClass('active');
           $(this).addClass('active');
-          $('#dashboardSection, #inscricoesSection').hide();
+          $('#dashboardSection, #inscricoesSection, #resultadosSection').hide();
           $(`#${section}Section`).show();
-
           if (section === 'dashboard') loadDashboardData();
           if (section === 'inscricoes') reloadInscricoesTable();
+          if (section === 'resultados') loadResultados();
         });
       }
 
-      // Dashboard: Carrega os dados do endpoint e atualiza os summary cards e os gráficos
       async function loadDashboardData() {
         try {
           const response = await fetch('/api/admin/dashboard-data');
@@ -372,9 +423,7 @@
         window.totalInscritosGlobal = totais.total || 0;
       }
 
-      // Renderiza os gráficos nas abas
       function renderCharts(cargoData, regiaoData) {
-        // Gráfico de Inscrições por Cargo (vertical)
         const cargoCtx = document.getElementById('cargoChart').getContext('2d');
         if (cargoChart) cargoChart.destroy();
         cargoChart = new Chart(cargoCtx, {
@@ -401,13 +450,10 @@
                 }
               }
             },
-            scales: {
-              y: { beginAtZero: true, ticks: { precision: 0 } }
-            }
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
           }
         });
 
-        // Gráfico Horizontal de Inscrições por Região
         const regiaoCtx = document.getElementById('regiaoChart').getContext('2d');
         if (regiaoChart) regiaoChart.destroy();
         regiaoChart = new Chart(regiaoCtx, {
@@ -438,13 +484,10 @@
                 }
               }
             },
-            scales: {
-              x: { beginAtZero: true, ticks: { precision: 0 } }
-            }
+            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
           }
         });
 
-        // Evento de clique no gráfico de Região: mostra detalhes dos cargos naquela região
         document.getElementById('regiaoChart').onclick = async function(evt) {
           let points = regiaoChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
           if (points.length > 0) {
@@ -463,7 +506,6 @@
         };
       }
 
-      // Busca e agrupa as inscrições por cargo para uma dada região
       async function fetchCargosPorRegiao(region) {
         try {
           const response = await fetch(`/api/admin/inscricoes?regiao=${encodeURIComponent(region)}`);
@@ -485,7 +527,6 @@
         }
       }
 
-      // Tabela de Inscrições (DataTable)
       function initDataTable() {
         inscricoesTable = $('#inscricoesTable').DataTable({
           ajax: {
@@ -495,7 +536,7 @@
           columns: [
             { data: 'inscricao_id' },
             { data: 'candidato_nome' },
-            { 
+            {
               data: 'candidato_cpf',
               render: function(data) {
                 return data.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -503,7 +544,7 @@
             },
             { data: 'cargo_nome' },
             { data: 'regiao' },
-            { 
+            {
               data: 'status',
               render: function(data) {
                 const statusMap = {
@@ -515,42 +556,28 @@
                 return `<span class="badge bg-${badgeClass} badge-status">${data}</span>`;
               }
             },
-            /*{ 
+            {
               data: 'data_inscricao',
               render: function(data) {
-                return new Date(data).toLocaleDateString('pt-BR');
-              }*/
-
-
-              { 
-                
-                data: 'data_inscricao',
-                render: function(data) {
-                    const dt = new Date(data);
-                    const options = {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                    };
-                    return dt.toLocaleString('pt-BR', options).replace(', ', ' às ');
-                },
-
-
-            
-
+                const dt = new Date(data);
+                const options = {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                };
+                return dt.toLocaleString('pt-BR', options).replace(', ', ' às ');
+              }
             },
             {
               data: 'inscricao_id',
               render: function(data) {
-                return `
-                  <button class="btn btn-sm btn-outline-primary view-btn" data-id="${data}">
-                    <i class="bi bi-eye"></i>
-                  </button>
-                `;
+                return `<button class="btn btn-sm btn-outline-primary view-btn" data-id="${data}">
+                          <i class="bi bi-eye"></i>
+                        </button>`;
               },
               orderable: false
             }
@@ -580,13 +607,102 @@
         inscricoesTable.ajax.reload();
       }
 
-      // Evento para o botão de busca global
+      async function loadResultados() {
+        try {
+          $('#resultadosContainer').html(`
+            <div class="text-center my-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+              </div>
+              <p class="mt-2">Carregando resultados...</p>
+            </div>
+          `);
+          
+          const cargoSelecionado = $('#filterCargo').val();
+          const regiaoSelecionada = $('#filterRegiao').val();
+          let url = '/api/admin/resultados-pss';
+          const params = [];
+          if (cargoSelecionado) params.push(`cargo=${encodeURIComponent(cargoSelecionado)}`);
+          if (regiaoSelecionada) params.push(`regiao=${encodeURIComponent(regiaoSelecionada)}`);
+          if (params.length > 0) url += '?' + params.join('&');
+
+          const response = await fetch(url);
+          const data = await response.json();
+          
+          if (!response.ok) throw new Error(data.error || 'Erro ao carregar resultados');
+          
+          if (data.length === 0) {
+            $('#resultadosContainer').html('<p class="text-center">Nenhum resultado encontrado.</p>');
+            return;
+          }
+          
+          let html = '';
+          
+          data.forEach(grupo => {
+            html += `
+              <div class="resultado-cargo mb-4">
+                <div class="resultado-header">
+                  <h5>
+                    <span class="badge bg-primary">${grupo.cargo}</span>
+                    <span class="badge bg-secondary ms-2">${grupo.regiao}</span>
+                    <small class="ms-2">Vagas: ${grupo.vagas_imediatas} imediatas, ${grupo.reserva_pcd} reserva PCD</small>
+                  </h5>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-bordered table-hover table-resultados">
+                    <thead>
+                      <tr>
+                        <th width="80">Class.</th>
+                        <th>Nome</th>
+                        <th width="150">CPF</th>
+                        <th width="100">Pontuação</th>
+                        <th width="150">Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${grupo.candidatos.map((candidato, index) => `
+                        <tr class="${candidato.classificacao <= 5 ? 'classificado' : 'nao-classificado'}">
+                          <td>${candidato.classificacao}º</td>
+                          <td>${candidato.candidato_nome}</td>
+                          <td>${candidato.candidato_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</td>
+                          <td>${candidato.pontuacao || 0}</td>
+                          <td>${candidato.situacao}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `;
+          });
+          
+          $('#resultadosContainer').html(html);
+        } catch (error) {
+          console.error('Erro ao carregar resultados:', error);
+          $('#resultadosContainer').html(`
+            <div class="alert alert-danger">
+              Erro ao carregar resultados: ${error.message}
+            </div>
+          `);
+        }
+      }
+
+      // Configura eventos dos filtros e botão PDF
+      $('#btnFiltrar').click(loadResultados);
+
+      document.getElementById('btnGeneratePDF').addEventListener('click', () => {
+        const cargoSelecionado = $('#filterCargo').val() || '';
+        const regiaoSelecionada = $('#filterRegiao').val() || '';
+        let url = `/api/admin/resultados-pss/pdf?cargo=${encodeURIComponent(cargoSelecionado)}&regiao=${encodeURIComponent(regiaoSelecionada)}`;
+        window.open(url, '_blank');
+      });
+
       function setupEventListeners() {
         $('#refreshBtn').click(loadDashboardData);
         $('#searchBtn').click(function() {
           const cpf = $('#searchInput').val().replace(/\D/g, '');
           if (cpf.length === 11) {
-            searchCandidate(cpf);
+            console.log("Função de busca de candidato não implementada neste exemplo.");
           } else {
             alert('Informe um CPF válido (11 dígitos)');
           }
@@ -600,19 +716,12 @@
         });
       }
 
-      async function searchCandidate(cpf) {
-        try {
-          const response = await fetch(`/api/admin/candidato/${cpf}`);
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || 'Candidato não encontrado');
-          console.log("Dados do candidato:", data.candidato);
-        } catch (error) {
-          console.error('Erro na busca:', error);
-          alert(error.message);
-        }
+      function searchCandidate(cpf) {
+        // Implemente a busca do candidato conforme sua API, se necessário.
+        console.log("Função de busca de candidato não implementada neste exemplo.");
       }
 
-      window.reloadInscricoesTable = reloadInscricoesTable;
+      setupEventListeners();
     });
   </script>
 </body>
