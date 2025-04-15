@@ -360,6 +360,7 @@ router.get('/resultados-pss', async (req, res) => {
 // - A Modalidade da Concorrência deverá exibir "PcD" se o campo pcd for verdadeiro e "AMPLA CONCORRÊNCIA" caso contrário.
 // - Agrupar os registros pela região.
 // - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
+// Endpoint para gerar o PDF dos resultados (ATUALIZADO)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -367,7 +368,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Buscando os registros na DashboardView ordenados por região e, em seguida, pelo nome do candidato
+    // Busca os resultados filtrados
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -377,7 +378,19 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // Agrupar os registros por região
+    // DEBUG: Verificar os primeiros registros
+    if (resultados.length > 0) {
+      console.log('Debug - Primeiro registro:', {
+        id: resultados[0].inscricao_id,
+        nome: resultados[0].candidato_nome,
+        pcd: resultados[0].pcd,
+        data_nasc: resultados[0].data_nascimento,
+        tipo_pcd: typeof resultados[0].pcd,
+        tipo_data: typeof resultados[0].data_nascimento
+      });
+    }
+
+    // Agrupa por região
     const grupos = {};
     resultados.forEach(candidato => {
       const reg = candidato.regiao;
@@ -390,99 +403,125 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       grupos[reg].candidatos.push(candidato);
     });
 
-    // Montando o conteúdo do PDF utilizando pdfmake
-    const content = [];
-    content.push({ text: 'Resultado Final do PSS 001/2025', style: 'header' });
+    // Configuração do documento PDF
+    const content = [
+      { 
+        text: 'Resultado Final do PSS 001/2025', 
+        style: 'header',
+        margin: [0, 0, 0, 20]
+      }
+    ];
+
+    // Adiciona cada região como uma seção no PDF
     Object.values(grupos).forEach(grupo => {
-      // Cabeçalho do grupo: Região e total de inscritos
+      // Cabeçalho da região
       content.push({ 
-        text: `Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
-        style: 'subheader' 
+        text: `Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`,
+        style: 'subheader',
+        margin: [0, 0, 0, 10]
       });
 
-      // Construção da tabela com as colunas:
-      // Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo
-      const tableBody = [];
-      tableBody.push([
-        { text: 'Número de Inscrição', style: 'tableHeader' },
-        { text: 'Nome', style: 'tableHeader' },
-        { text: 'Modalidade da Concorrência', style: 'tableHeader' },
-        { text: 'Data de Nascimento', style: 'tableHeader' },
-        { text: 'Cargo', style: 'tableHeader' }
-      ]);
+      // Tabela de candidatos
+      const tableBody = [
+        [
+          { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
+          { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
+          { text: 'Modalidade', style: 'tableHeader', alignment: 'center' },
+          { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
+          { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
+        ]
+      ];
 
+      // Linhas da tabela
       grupo.candidatos.forEach(candidato => {
         tableBody.push([
-          candidato.inscricao_id ? candidato.inscricao_id.toString() : '',
-          candidato.candidato_nome,
-          isPCD(candidato.pcd) ? "PcD" : "AMPLA CONCORRÊNCIA",
-          formatDate(candidato.data_nascimento),
-          candidato.cargo_nome
+          { text: candidato.inscricao_id?.toString() || 'N/A', alignment: 'center' },
+          { text: candidato.candidato_nome || 'N/A', alignment: 'left' },
+          { text: isPCD(candidato.pcd) ? "PcD" : "Ampla", alignment: 'center' },
+          { text: formatDate(candidato.data_nascimento), alignment: 'center' },
+          { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
         ]);
       });
 
       content.push({
         table: {
           headerRows: 1,
-          widths: ['auto', '*', 'auto', 'auto', 'auto'],
+          widths: [60, '*', 70, 80, '*'],
           body: tableBody
         },
-        layout: 'lightHorizontalLines',
+        layout: {
+          hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => '#aaaaaa',
+          vLineColor: () => '#aaaaaa',
+          paddingTop: (i) => i === 0 ? 5 : 3,
+          paddingBottom: (i, node) => (i === node.table.body.length - 1) ? 5 : 3
+        },
         margin: [0, 0, 0, 20]
       });
     });
 
+    // Definição completa do PDF
     const docDefinition = {
       pageSize: 'A4',
+      pageOrientation: 'portrait',
       pageMargins: [40, 60, 40, 60],
       content: content,
       styles: {
         header: {
-          fontSize: 22,
+          fontSize: 18,
           bold: true,
           alignment: 'center',
-          color: '#2c3e50',
-          margin: [0, 0, 0, 20]
+          color: '#2c3e50'
         },
         subheader: {
-          fontSize: 16,
+          fontSize: 14,
           bold: true,
           color: '#34495e',
-          margin: [0, 10, 0, 5]
+          margin: [0, 5, 0, 5]
         },
         tableHeader: {
           bold: true,
-          fontSize: 12,
+          fontSize: 10,
           color: '#ffffff',
-          fillColor: '#2980b9',
-          alignment: 'center',
-          margin: [0, 5, 0, 5]
+          fillColor: '#3498db',
+          margin: [0, 2, 0, 2]
         }
       },
       defaultStyle: {
-        font: 'Roboto'
+        font: 'Helvetica',
+        fontSize: 10
       }
     };
 
-    // Configurar pdfmake para Node.js
+    // Criação do PDF
     const PdfPrinter = require('pdfmake');
     const fonts = {
-      Roboto: {
-        normal: 'fonts/Roboto-Regular.ttf',
-        bold: 'fonts/Roboto-Medium.ttf',
-        italics: 'fonts/Roboto-Italic.ttf',
-        bolditalics: 'fonts/Roboto-MediumItalic.ttf'
+      Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
       }
     };
+
     const printer = new PdfPrinter(fonts);
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    res.setHeader('Content-Disposition', 'attachment; filename="resultados.pdf"');
+
+    // Configura os headers da resposta
+    res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
+
+    // Envia o PDF
     pdfDoc.pipe(res);
     pdfDoc.end();
+
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: "Erro ao gerar PDF",
+      details: error.message 
+    });
   }
 });
 
