@@ -364,6 +364,9 @@ router.get('/resultados-pss', async (req, res) => {
 // - Exibir as informações: Número de Inscrição, Nome (concatenado com " - PcD" se for verdadeiro), Data de Nascimento e Cargo.
 // - Agrupar os registros pela região.
 // - No cabeçalho de cada grupo, exibir o total de inscritos naquela região.
+// Endpoint para gerar o PDF corrigido e organizado
+// Endpoint para gerar o PDF corrigido e organizado
+// Endpoint para gerar o PDF dos resultados filtrados (ajustado)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -371,9 +374,10 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os registros na DashboardView ordenados por região e pelo nome do candidato
+    // 1. Busca dos dados especificando os atributos necessários, incluindo data_nascimento e pcd
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
+      attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao'],
       order: [
         ['regiao', 'ASC'],
         ['candidato_nome', 'ASC']
@@ -381,53 +385,62 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // Agrupar os registros por região
+    console.log('Dados brutos da view:', JSON.stringify(resultados.slice(0, 3), null, 2));
+
+    // 2. Processamento dos dados: agrupa por região e formata os campos conforme necessário
     const grupos = {};
     resultados.forEach(candidato => {
-      const reg = candidato.regiao;
-      if (!grupos[reg]) {
-        grupos[reg] = { regiao: reg, candidatos: [] };
+      const regiaoKey = candidato.regiao;
+      if (!grupos[regiaoKey]) {
+        grupos[regiaoKey] = {
+          regiao: regiaoKey,
+          candidatos: []
+        };
       }
-      grupos[reg].candidatos.push(candidato);
+
+      grupos[regiaoKey].candidatos.push({
+        inscricao_id: candidato.inscricao_id,
+        nome: candidato.candidato_nome + (isPCD(candidato.pcd) ? " - PcD" : ""),
+        nascimento: formatDate(candidato.data_nascimento),
+        cargo: candidato.cargo_nome
+      });
     });
 
-    // Montagem do conteúdo do PDF usando pdfmake
+    // 3. Montagem do conteúdo do PDF usando pdfmake
     const content = [];
-    content.push({ text: 'Resultado Final do PSS 001/2025', style: 'header' });
+    content.push({ text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', style: 'header', margin: [0, 0, 0, 20] });
     Object.values(grupos).forEach(grupo => {
-      // Cabeçalho do grupo: Região e total de inscritos
+      // Cabeçalho do grupo com total de inscritos
       content.push({ 
-        text: `Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
+        text: `Região: ${grupo.regiao.toUpperCase()} - ${grupo.candidatos.length} inscritos`, 
         style: 'subheader',
         margin: [0, 10, 0, 10]
       });
 
-      // Preparação dos dados da tabela
+      // Construção da tabela com os dados: Número de Inscrição, Nome, Data de Nascimento e Cargo
       const tableBody = [];
       // Cabeçalho da tabela
       tableBody.push([
-        { text: 'Número de Inscrição', style: 'tableHeader' },
-        { text: 'Nome', style: 'tableHeader' },
-        { text: 'Data de Nascimento', style: 'tableHeader' },
-        { text: 'Cargo', style: 'tableHeader' }
+        { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
+        { text: 'Nome', style: 'tableHeader', alignment: 'left' },
+        { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
+        { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
       ]);
 
-      // Para cada candidato, formata o nome conforme a query de teste:
-      // concatena " - PcD" se o campo pcd for verdadeiro.
       grupo.candidatos.forEach(candidato => {
-        const nomeFormatado = candidato.candidato_nome + (isPCD(candidato.pcd) ? " - PcD" : "");
         tableBody.push([
           { text: candidato.inscricao_id ? candidato.inscricao_id.toString() : 'N/A', alignment: 'center' },
-          { text: nomeFormatado, alignment: 'left' },
-          { text: formatDate(candidato.data_nascimento), alignment: 'center' },
-          { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
+          { text: candidato.nome, alignment: 'left' },
+          { text: candidato.nascimento, alignment: 'center' },
+          { text: candidato.cargo || 'N/A', alignment: 'left' }
         ]);
       });
 
       content.push({
         table: {
           headerRows: 1,
-          widths: ['auto', '*', 'auto', '*'],
+          // Utilizando porcentagens para que a tabela caiba no A4 com margens adequadas
+          widths: ['20%', '40%', '20%', '20%'],
           body: tableBody
         },
         layout: 'lightHorizontalLines',
@@ -435,16 +448,17 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       });
     });
 
+    // 4. Configuração do docDefinition para pdfmake
     const docDefinition = {
       pageSize: 'A4',
-      pageMargins: [40, 60, 40, 60],
+      // Margens definidas para um papel A4
+      pageMargins: [40, 40, 40, 40],
       content: content,
       styles: {
         header: {
           fontSize: 22,
           bold: true,
-          alignment: 'center',
-          margin: [0, 0, 0, 20]
+          alignment: 'center'
         },
         subheader: {
           fontSize: 16,
@@ -456,16 +470,16 @@ router.get('/resultados-pss/pdf', async (req, res) => {
           fontSize: 10,
           color: 'white',
           fillColor: '#2c3e50',
-          alignment: 'center',
-          margin: [0, 5, 0, 5]
+          alignment: 'center'
         }
       },
       defaultStyle: {
-        font: 'Helvetica'
+        font: 'Helvetica',
+        fontSize: 10
       }
     };
 
-    // Configurar pdfmake para Node.js
+    // 5. Gerar o PDF com pdfmake
     const PdfPrinter = require('pdfmake');
     const fonts = {
       Helvetica: {
@@ -475,15 +489,21 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         bolditalics: 'Helvetica-BoldOblique'
       }
     };
+    
     const printer = new PdfPrinter(fonts);
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
+
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
     pdfDoc.pipe(res);
     pdfDoc.end();
+
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ error: "Erro ao gerar PDF", details: error.message });
+    res.status(500).json({ 
+      error: "Erro ao gerar PDF",
+      details: error.message 
+    });
   }
 });
 
