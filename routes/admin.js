@@ -9,8 +9,20 @@ const ValidacaoInscricao = require('../models/ValidacaoInscricao');
 const CargoRegiao = require('../models/CargoRegiao'); // Modelo para a tabela cargo_regioes
 
 const PDFDocument = require('pdfkit'); // Biblioteca para gerar PDF (usada em outros endpoints, se necessário)
-
 const router = express.Router();
+
+// Helper para interpretar o valor da coluna PCD
+function isPCD(val) {
+  return val === true || (typeof val === 'string' && val.toLowerCase() === 'true');
+}
+
+// Helper para formatar data (data de nascimento)
+function formatDate(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 // ======================================================================
 // 1. Endpoints já existentes (Dashboard, Inscrições, Candidato, etc.)
@@ -301,27 +313,30 @@ router.get('/resultados-pss', async (req, res) => {
       nest: true
     });
 
-    // Para cada grupo, adiciona informações de vagas e classifica os candidatos
+    // Para cada grupo, adiciona informações de vagas e classifica os candidatos,
+    // usando a função isPCD para determinar corretamente o valor.
     const resultadoFinal = Object.values(grupos).map(grupo => {
       // Procura a vaga que corresponda ao cargo e região
       const vaga = vagas.find(v =>
         v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
       );
       const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
-      // A coluna reserva_pcd é um booleano: se true, consideramos 1 vaga reservada, caso contrário 0.
       const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
       grupo.candidatos = grupo.candidatos.map((candidato, index) => {
         let situacao = 'Não Classificado';
         if (index < vagas_imediatas) {
           situacao = 'Classificado';
-        } else if (candidato.pcd && index < (vagas_imediatas + reserva_pcd)) {
-          situacao = 'Classificado (Reserva PCD)';
+        } else if (isPCD(candidato.pcd) || isPCD(candidato.PCD)) {
+          if (index < (vagas_imediatas + reserva_pcd)) {
+            situacao = 'Classificado (Reserva PCD)';
+          }
         }
         return {
           ...candidato,
           classificacao: index + 1,
           situacao,
-          pcd: candidato.pcd  // Garantindo que o campo pcd seja mantido na saída
+          // Inclui o valor convertido usando isPCD para ser utilizado no PDF e na tela
+          pcd: isPCD(candidato.pcd) || isPCD(candidato.PCD)
         };
       });
       return {
@@ -340,9 +355,9 @@ router.get('/resultados-pss', async (req, res) => {
 
 // Endpoint para gerar o PDF dos resultados filtrados
 // Requisitos atualizados:
-// - Agrupar por região e cargo (ordenado alfabeticamente)
-// - Exibir no PDF as colunas: Nome, ID Inscrição, PCD e Situação (fixa "CLASSIFICADO")
-// - No cabeçalho de cada grupo, incluir o total de inscritos naquele grupo
+// - Exibir as informações: Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo.
+// - Agrupar os registros pela região.
+// - No cabeçalho de cada grupo, exibir o total de inscritos daquela região.
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -350,80 +365,63 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Buscando resultados na DashboardView ordenados por cargo e região (ordem alfabética)
+    // Buscando os registros na DashboardView ordenados por região e, em seguida, pelo nome do candidato
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
-        ['cargo_nome', 'ASC'],
-        ['regiao', 'ASC']
+        ['regiao', 'ASC'],
+        ['candidato_nome', 'ASC']
       ],
       raw: true
     });
 
-    // Agrupar os resultados por cargo e região
+    // Agrupar os registros por região
     const grupos = {};
     resultados.forEach(candidato => {
-      const chave = `${candidato.cargo_nome}|${candidato.regiao}`;
-      if (!grupos[chave]) {
-        grupos[chave] = {
-          cargo: candidato.cargo_nome,
-          regiao: candidato.regiao,
+      const reg = candidato.regiao;
+      if (!grupos[reg]) {
+        grupos[reg] = {
+          regiao: reg,
           candidatos: []
         };
       }
-      grupos[chave].candidatos.push(candidato);
-    });
-
-    // Buscar as vagas disponíveis (fazendo join com o modelo Cargo para obter o nome)
-    const vagas = await CargoRegiao.findAll({
-      include: [{
-        model: Cargo,
-        as: 'cargo',
-        attributes: ['nome']
-      }],
-      raw: true,
-      nest: true
-    });
-
-    // Processar cada grupo: ordenar os candidatos alfabeticamente pelo nome
-    const resultadoFinal = Object.values(grupos).map(grupo => {
-      // Ordena os candidatos alfabeticamente pelo nome
-      grupo.candidatos.sort((a, b) => a.candidato_nome.localeCompare(b.candidato_nome));
-      return grupo;
+      grupos[reg].candidatos.push(candidato);
     });
 
     // Montando o conteúdo do PDF utilizando pdfmake
     const content = [];
     content.push({ text: 'Resultado Final do PSS 001/2025', style: 'header' });
-    resultadoFinal.forEach(grupo => {
-      // Cabeçalho do grupo: cargo, região e total de inscritos
+    Object.values(grupos).forEach(grupo => {
+      // Cabeçalho do grupo: Região e total de inscritos
       content.push({ 
-        text: `Cargo: ${grupo.cargo} | Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
+        text: `Região: ${grupo.regiao} | Total Inscritos: ${grupo.candidatos.length}`, 
         style: 'subheader' 
       });
 
-      // Construção da tabela com as colunas: Nome, ID Inscrição, PCD e Situação
+      // Construção da tabela com as colunas: Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento e Cargo
       const tableBody = [];
       tableBody.push([
+        { text: 'Número de Inscrição', style: 'tableHeader' },
         { text: 'Nome', style: 'tableHeader' },
-        { text: 'ID Inscrição', style: 'tableHeader' },
-        { text: 'PCD', style: 'tableHeader' },
-        { text: 'Situação', style: 'tableHeader' }
+        { text: 'Modalidade da Concorrência', style: 'tableHeader' },
+        { text: 'Data de Nascimento', style: 'tableHeader' },
+        { text: 'Cargo', style: 'tableHeader' }
       ]);
 
       grupo.candidatos.forEach(candidato => {
         tableBody.push([
-          candidato.candidato_nome,
           candidato.inscricao_id ? candidato.inscricao_id.toString() : '',
-          candidato.pcd ? "SIM" : "NÃO",
-          'CLASSIFICADO'
+          candidato.candidato_nome,
+          candidato.modalidade || '',
+          formatDate(candidato.data_nascimento),
+          candidato.cargo_nome
         ]);
       });
 
       content.push({
         table: {
           headerRows: 1,
-          widths: ['*', 'auto', 'auto', 'auto'],
+          widths: ['auto', '*', 'auto', 'auto', 'auto'],
           body: tableBody
         },
         layout: 'lightHorizontalLines',
