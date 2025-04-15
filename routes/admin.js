@@ -320,7 +320,8 @@ router.get('/resultados-pss', async (req, res) => {
         return {
           ...candidato,
           classificacao: index + 1,
-          situacao
+          situacao,
+          pcd: candidato.pcd  // Garantindo que o campo pcd seja mantido na saída
         };
       });
       return {
@@ -338,11 +339,10 @@ router.get('/resultados-pss', async (req, res) => {
 });
 
 // Endpoint para gerar o PDF dos resultados filtrados
-// Novos requisitos:
+// Requisitos atualizados:
 // - Agrupar por região e cargo (ordenado alfabeticamente)
-// - Exibir no PDF somente: NOME concatenado com "(PcD)" se aplicável, ID INSCRIÇÃO e SITUACAO (fixa "CLASSIFICADO")
-// - Excluir a coluna de ordem/classificação
-// - No cabeçalho de cada grupo, incluir o total de inscritos na respectiva região (do grupo)
+// - Exibir no PDF as colunas: Nome, ID Inscrição, PCD e Situação (fixa "CLASSIFICADO")
+// - No cabeçalho de cada grupo, incluir o total de inscritos naquele grupo
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -402,25 +402,20 @@ router.get('/resultados-pss/pdf', async (req, res) => {
         style: 'subheader' 
       });
 
-      // Construção da tabela com as colunas: Nome, ID Inscrição, Situação
+      // Construção da tabela com as colunas: Nome, ID Inscrição, PCD e Situação
       const tableBody = [];
       tableBody.push([
         { text: 'Nome', style: 'tableHeader' },
         { text: 'ID Inscrição', style: 'tableHeader' },
+        { text: 'PCD', style: 'tableHeader' },
         { text: 'Situação', style: 'tableHeader' }
       ]);
 
       grupo.candidatos.forEach(candidato => {
-        // Concatena "(PcD)" ao nome se o candidato tiver pcd verdadeiro
-        let nomeCompleto = candidato.candidato_nome;
-        if (candidato.pcd) {
-          if (!nomeCompleto.includes("(PcD)")) {
-            nomeCompleto += " (PcD)";
-          }
-        }
         tableBody.push([
-          nomeCompleto,
+          candidato.candidato_nome,
           candidato.inscricao_id ? candidato.inscricao_id.toString() : '',
+          candidato.pcd ? "SIM" : "NÃO",
           'CLASSIFICADO'
         ]);
       });
@@ -428,7 +423,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       content.push({
         table: {
           headerRows: 1,
-          widths: ['*', 'auto', 'auto'],
+          widths: ['*', 'auto', 'auto', 'auto'],
           body: tableBody
         },
         layout: 'lightHorizontalLines',
