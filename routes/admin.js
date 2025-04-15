@@ -6,32 +6,36 @@ const Inscricao = require('../models/Inscricao');
 const Cargo = require('../models/Cargo');
 const Candidato = require('../models/Candidato');
 const ValidacaoInscricao = require('../models/ValidacaoInscricao');
-const CargoRegiao = require('../models/CargoRegiao'); // Modelo para a tabela cargo_regioes
-
-const PDFDocument = require('pdfkit'); // Biblioteca para gerar PDF (usada em outros endpoints, se necessário)
+const CargoRegiao = require('../models/CargoRegiao');
+const PDFDocument = require('pdfkit');
 const router = express.Router();
 
 // Helper para interpretar o valor da coluna PCD
 function isPCD(val) {
-  return val === true || (typeof val === 'string' && val.toLowerCase() === 'true');
+  if (val === null || val === undefined) return false;
+  return val === true || val === 'true' || val === 'TRUE' || val === 1;
 }
 
-// Helper para formatar a data (agora com suporte a strings YYYY-MM-DD)
+// Helper para formatar a data
 function formatDate(date) {
   if (!date) return 'N/A';
   
   // Se for string no formato YYYY-MM-DD
   if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
     const [year, month, day] = date.split('-');
-    return `${day}/${month}/${year}`;
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
   }
   
   // Se for objeto Date
   const d = new Date(date);
-  if (isNaN(d)) return 'N/A';
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (isNaN(d.getTime())) return 'N/A';
+  
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  
+  return `${day}/${month}/${year}`;
 }
-
 
 // ======================================================================
 // 1. Endpoints já existentes (Dashboard, Inscrições, Candidato, etc.)
@@ -376,7 +380,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Busca os resultados filtrados
+    // Busca os resultados incluindo os dados brutos para debug
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -386,14 +390,13 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // DEBUG: Verificar os primeiros registros
+    // Verificação dos dados
     if (resultados.length > 0) {
-      console.log('Debug - Primeiro registro:', {
-        id: resultados[0].inscricao_id,
+      console.log('Dados do primeiro candidato:', {
         nome: resultados[0].candidato_nome,
         pcd: resultados[0].pcd,
-        data_nasc: resultados[0].data_nascimento,
         tipo_pcd: typeof resultados[0].pcd,
+        data_nasc: resultados[0].data_nascimento,
         tipo_data: typeof resultados[0].data_nascimento
       });
     }
@@ -412,69 +415,57 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     });
 
     // Configuração do documento PDF
-    const content = [
-      { 
-        text: 'Resultado Final do PSS 001/2025', 
-        style: 'header',
-        margin: [0, 0, 0, 20]
-      }
-    ];
-
-    // Adiciona cada região como uma seção no PDF
-    Object.values(grupos).forEach(grupo => {
-      // Cabeçalho da região
-      content.push({ 
-        text: `Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`,
-        style: 'subheader',
-        margin: [0, 0, 0, 10]
-      });
-
-      // Tabela de candidatos
-      const tableBody = [
-        [
-          { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
-          { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
-          { text: 'Modalidade', style: 'tableHeader', alignment: 'center' },
-          { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
-          { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
-        ]
-      ];
-
-      // Linhas da tabela
-      grupo.candidatos.forEach(candidato => {
-        tableBody.push([
-          { text: candidato.inscricao_id?.toString() || 'N/A', alignment: 'center' },
-          { text: candidato.candidato_nome || 'N/A', alignment: 'left' },
-          { text: isPCD(candidato.pcd) ? "PcD" : "Ampla", alignment: 'center' },
-          { text: formatDate(candidato.data_nascimento), alignment: 'center' },
-          { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
-        ]);
-      });
-
-      content.push({
-        table: {
-          headerRows: 1,
-          widths: [60, '*', 70, 80, '*'],
-          body: tableBody
-        },
-        layout: {
-          hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => '#aaaaaa',
-          vLineColor: () => '#aaaaaa',
-          paddingTop: (i) => i === 0 ? 5 : 3,
-          paddingBottom: (i, node) => (i === node.table.body.length - 1) ? 5 : 3
-        },
-        margin: [0, 0, 0, 20]
-      });
-    });
-
-    // Definição completa do PDF
     const docDefinition = {
       pageSize: 'A4',
       pageOrientation: 'portrait',
       pageMargins: [40, 60, 40, 60],
-      content: content,
+      content: [
+        { 
+          text: 'Resultado Final do PSS 001/2025', 
+          style: 'header',
+          margin: [0, 0, 0, 20]
+        },
+        ...Object.values(grupos).map(grupo => ({
+          stack: [
+            { 
+              text: `Região: ${grupo.regiao} | Total de Inscritos: ${grupo.candidatos.length}`,
+              style: 'subheader',
+              margin: [0, 0, 0, 10]
+            },
+            {
+              table: {
+                headerRows: 1,
+                widths: [60, '*', 70, 80, '*'],
+                body: [
+                  [
+                    { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
+                    { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
+                    { text: 'Modalidade', style: 'tableHeader', alignment: 'center' },
+                    { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
+                    { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
+                  ],
+                  ...grupo.candidatos.map(candidato => [
+                    { text: candidato.inscricao_id?.toString() || 'N/A', alignment: 'center' },
+                    { text: candidato.candidato_nome || 'N/A', alignment: 'left' },
+                    { text: isPCD(candidato.pcd) ? "PcD" : "Ampla", alignment: 'center' },
+                    { text: formatDate(candidato.data_nascimento), alignment: 'center' },
+                    { text: candidato.cargo_nome || 'N/A', alignment: 'left' }
+                  ])
+                ]
+              },
+              layout: {
+                hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+                vLineWidth: () => 0.5,
+                hLineColor: () => '#aaaaaa',
+                vLineColor: () => '#aaaaaa',
+                paddingTop: (i) => i === 0 ? 5 : 3,
+                paddingBottom: (i, node) => (i === node.table.body.length - 1) ? 5 : 3
+              },
+              margin: [0, 0, 0, 20]
+            }
+          ]
+        }))
+      ],
       styles: {
         header: {
           fontSize: 18,
@@ -516,11 +507,8 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     const printer = new PdfPrinter(fonts);
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
 
-    // Configura os headers da resposta
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
-
-    // Envia o PDF
     pdfDoc.pipe(res);
     pdfDoc.end();
 
