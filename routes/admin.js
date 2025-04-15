@@ -436,4 +436,166 @@ router.get('/resultados-pss/pdf', async (req, res) => {
   }
 });
 
+// Endpoint para gerar o PDF dos resultados filtrados usando pdfmake
+router.get('/resultados-pss/pdf', async (req, res) => {
+  try {
+    const { cargo, regiao } = req.query;
+    const whereDashboard = { status: 'PENDENTE' };
+    if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
+    if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
+
+    const resultados = await DashboardView.findAll({
+      where: whereDashboard,
+      order: [
+        ['cargo_nome', 'ASC'],
+        ['regiao', 'ASC'],
+        ['pontuacao', 'DESC']
+      ],
+      raw: true
+    });
+
+    // Agrupar os resultados por cargo e região
+    const grupos = {};
+    resultados.forEach(candidato => {
+      const chave = `${candidato.cargo_nome}|${candidato.regiao}`;
+      if (!grupos[chave]) {
+        grupos[chave] = {
+          cargo: candidato.cargo_nome,
+          regiao: candidato.regiao,
+          candidatos: []
+        };
+      }
+      grupos[chave].candidatos.push(candidato);
+    });
+
+    // Buscar as vagas disponíveis (com join no modelo Cargo para obter o nome)
+    const vagas = await CargoRegiao.findAll({
+      include: [{
+        model: Cargo,
+        as: 'cargo',
+        attributes: ['nome']
+      }],
+      raw: true,
+      nest: true
+    });
+
+    // Para cada grupo, junta as informações de vagas e classifica os candidatos
+    const resultadoFinal = Object.values(grupos).map(grupo => {
+      const vaga = vagas.find(v =>
+        v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
+      );
+      const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
+      // Aqui a coluna reserva_pcd é um booleano: se true, considera 1 vaga reservada, caso contrário 0.
+      const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
+      grupo.candidatos = grupo.candidatos.map((candidato, index) => {
+        let situacao = 'Não Classificado';
+        if (index < vagas_imediatas) {
+          situacao = 'Classificado';
+        } else if (candidato.pcd && index < (vagas_imediatas + reserva_pcd)) {
+          situacao = 'Classificado (Reserva PCD)';
+        }
+        return {
+          ...candidato,
+          classificacao: index + 1,
+          situacao
+        };
+      });
+      return {
+        ...grupo,
+        vagas_imediatas,
+        reserva_pcd
+      };
+    });
+
+    // Construindo o docDefinition para o pdfmake
+    // Crie um array de conteúdo que percorre os grupos para exibir os dados
+    const content = [
+      { text: 'Resultado Final do PSS 001/2025', style: 'header' }
+    ];
+
+    resultadoFinal.forEach(grupo => {
+      content.push({ text: `Cargo: ${grupo.cargo} | Região: ${grupo.regiao}`, style: 'subheader' });
+      content.push({ text: `Vagas Imediatas: ${grupo.vagas_imediatas}  |  Reserva PCD: ${grupo.reserva_pcd}`, style: 'subheader', margin: [0, 0, 0, 10] });
+
+      // Cria uma tabela para os candidatos do grupo
+      const tableBody = [
+        [
+          { text: 'Class.', style: 'tableHeader' },
+          { text: 'Nome', style: 'tableHeader' },
+          { text: 'CPF', style: 'tableHeader' },
+          { text: 'Pontuação', style: 'tableHeader' },
+          { text: 'Situação', style: 'tableHeader' }
+        ]
+      ];
+
+      grupo.candidatos.forEach(candidato => {
+        tableBody.push([
+          candidato.classificacao.toString(),
+          candidato.candidato_nome,
+          candidato.candidato_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+          candidato.pontuacao ? candidato.pontuacao.toString() : '0',
+          candidato.situacao
+        ]);
+      });
+
+      content.push({
+        table: {
+          headerRows: 1,
+          widths: ['auto', '*', 'auto', 'auto', '*'],
+          body: tableBody
+        },
+        layout: 'lightHorizontalLines',
+        margin: [0, 0, 0, 20]
+      });
+    });
+
+    const docDefinition = {
+      content,
+      styles: {
+        header: {
+          fontSize: 18,
+          bold: true,
+          alignment: 'center',
+          margin: [0, 0, 0, 20]
+        },
+        subheader: {
+          fontSize: 14,
+          bold: true,
+          margin: [0, 10, 0, 5]
+        },
+        tableHeader: {
+          bold: true,
+          fontSize: 12,
+          color: 'black'
+        },
+        tableData: {
+          fontSize: 10
+        }
+      }
+    };
+
+    // Configurar pdfmake para Node.js
+    const PdfPrinter = require('pdfmake');
+    const fonts = {
+      Roboto: {
+        normal: 'fonts/Roboto-Regular.ttf',
+        bold: 'fonts/Roboto-Medium.ttf',
+        italics: 'fonts/Roboto-Italic.ttf',
+        bolditalics: 'fonts/Roboto-MediumItalic.ttf'
+      }
+    };
+    const printer = new PdfPrinter(fonts);
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    res.setHeader('Content-Disposition', 'attachment; filename="resultados.pdf"');
+    res.setHeader('Content-Type', 'application/pdf');
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+  } catch (error) {
+    console.error("Erro ao gerar PDF:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
+
+
