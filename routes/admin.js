@@ -359,6 +359,7 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
+// Endpoint para gerar o PDF dos resultados filtrados (ajustado)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -366,205 +367,102 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // 1. Busca dos dados com todos os atributos necessários
+    // 1. Busca dos dados especificando os atributos necessários
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
-      attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao', 'pontuacao'],
+      attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao'],
       order: [
         ['regiao', 'ASC'],
-        ['cargo_nome', 'ASC'],
-        ['pontuacao', 'DESC'],
         ['candidato_nome', 'ASC']
       ],
       raw: true
     });
 
-    // 2. Processamento dos dados: agrupa por região e cargo
+    console.log('Dados brutos da view:', JSON.stringify(resultados.slice(0, 3), null, 2));
+
+    // 2. Processamento dos dados: agrupa por região e formata os campos
     const grupos = {};
     resultados.forEach(candidato => {
-      const grupoKey = `${candidato.regiao}|${candidato.cargo_nome}`;
-      if (!grupos[grupoKey]) {
-        grupos[grupoKey] = {
-          regiao: candidato.regiao,
-          cargo: candidato.cargo_nome,
-          candidatos: []
-        };
+      const regiaoKey = candidato.regiao;
+      if (!grupos[regiaoKey]) {
+        grupos[regiaoKey] = { regiao: regiaoKey, candidatos: [] };
       }
 
-      grupos[grupoKey].candidatos.push({
+      grupos[regiaoKey].candidatos.push({
         inscricao_id: candidato.inscricao_id,
         nome: candidato.candidato_nome,
-        pcd: isPCD(candidato.pcd),
+        modalidade: isPCD(candidato.pcd) ? "PcD" : "AMPLA CONCORRÊNCIA",
         nascimento: formatDate(candidato.data_nascimento),
-        pontuacao: candidato.pontuacao || 0
+        cargo: candidato.cargo_nome
       });
     });
 
-    // 3. Ordenar os grupos por região e cargo
-    const gruposOrdenados = Object.values(grupos).sort((a, b) => {
-      if (a.regiao < b.regiao) return -1;
-      if (a.regiao > b.regiao) return 1;
-      if (a.cargo < b.cargo) return -1;
-      if (a.cargo > b.cargo) return 1;
-      return 0;
-    });
-
-    // 4. Montagem do conteúdo do PDF
+    // 3. Montagem do conteúdo do PDF utilizando pdfmake
     const content = [];
-    
-    // Cabeçalho principal
-    content.push({ 
-      text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', 
-      style: 'header', 
-      margin: [0, 0, 0, 10] 
-    });
-    
-    // Nota explicativa sobre PcD
-    content.push({
-      text: 'Observação: Candidatos não PcD concorrem na modalidade de Ampla Concorrência.',
-      style: 'observacao',
-      margin: [0, 0, 0, 20]
-    });
-
-    // Para cada grupo (região + cargo)
-    gruposOrdenados.forEach(grupo => {
-      // Cabeçalho do grupo
+    content.push({ text: 'RESULTADO FINAL - PSS 001/2025', style: 'header', margin: [0, 0, 0, 20] });
+    Object.values(grupos).forEach(grupo => {
+      // Cabeçalho do grupo com total de inscritos na região
       content.push({ 
-        text: `Região: ${grupo.regiao.toUpperCase()} - Cargo: ${grupo.cargo.toUpperCase()} (${grupo.candidatos.length} inscritos)`, 
+        text: `Região: ${grupo.regiao.toUpperCase()} - ${grupo.candidatos.length} inscritos`, 
         style: 'subheader',
-        margin: [0, 10, 0, 5],
-        pageBreak: 'before'
+        margin: [0, 10, 0, 10]
       });
 
-      // Dividir candidatos em PcD e não PcD
-      const candidatosPCD = grupo.candidatos.filter(c => c.pcd);
-      const candidatosAmpla = grupo.candidatos.filter(c => !c.pcd);
+      // Construção da tabela com 5 colunas:
+      // Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento, Cargo
+      const tableBody = [];
+      tableBody.push([
+        { text: 'Número de Inscrição', style: 'tableHeader', alignment: 'center' },
+        { text: 'Nome', style: 'tableHeader', alignment: 'left' },
+        { text: 'Modalidade da Concorrência', style: 'tableHeader', alignment: 'center' },
+        { text: 'Data de Nascimento', style: 'tableHeader', alignment: 'center' },
+        { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
+      ]);
 
-      // Tabela de PcD (se houver)
-      if (candidatosPCD.length > 0) {
-        content.push({
-          text: 'Candidatos PcD:',
-          style: 'tableTitle',
-          margin: [0, 5, 0, 5]
-        });
-
-        const tableBodyPCD = [
-          [
-            { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
-            { text: 'Nome', style: 'tableHeader', alignment: 'left' },
-            { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
-            { text: 'Pontuação', style: 'tableHeader', alignment: 'center' }
-          ]
-        ];
-
-        candidatosPCD.forEach(candidato => {
-          tableBodyPCD.push([
-            { text: candidato.inscricao_id ? candidato.inscricao_id.toString() : 'N/A', alignment: 'center' },
-            { text: candidato.nome + ' - PcD', alignment: 'left' },
-            { text: candidato.nascimento, alignment: 'center' },
-            { text: candidato.pontuacao.toString(), alignment: 'center' }
-          ]);
-        });
-
-        content.push({
-          table: {
-            headerRows: 1,
-            widths: ['15%', '50%', '15%', '20%'],
-            body: tableBodyPCD,
-            dontBreakRows: true // Mantém linhas juntas
-          },
-          layout: {
-            hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-            vLineWidth: () => 0.5,
-            hLineColor: () => '#aaaaaa',
-            vLineColor: () => '#aaaaaa',
-            fillColor: (rowIndex) => (rowIndex === 0) ? '#2c3e50' : null
-          },
-          margin: [0, 0, 0, 15]
-        });
-      }
-
-      // Tabela de Ampla Concorrência
-      content.push({
-        text: 'Candidatos Ampla Concorrência:',
-        style: 'tableTitle',
-        margin: [0, 5, 0, 5]
-      });
-
-      const tableBodyAmpla = [
-        [
-          { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
-          { text: 'Nome', style: 'tableHeader', alignment: 'left' },
-          { text: 'Nascimento', style: 'tableHeader', alignment: 'center' },
-          { text: 'Pontuação', style: 'tableHeader', alignment: 'center' }
-        ]
-      ];
-
-      candidatosAmpla.forEach(candidato => {
-        tableBodyAmpla.push([
+      grupo.candidatos.forEach(candidato => {
+        tableBody.push([
           { text: candidato.inscricao_id ? candidato.inscricao_id.toString() : 'N/A', alignment: 'center' },
           { text: candidato.nome, alignment: 'left' },
+          { text: candidato.modalidade, alignment: 'center' },
           { text: candidato.nascimento, alignment: 'center' },
-          { text: candidato.pontuacao.toString(), alignment: 'center' }
+          { text: candidato.cargo || 'N/A', alignment: 'left' }
         ]);
       });
 
       content.push({
         table: {
           headerRows: 1,
-          widths: ['15%', '50%', '15%', '20%'],
-          body: tableBodyAmpla,
-          dontBreakRows: true // Mantém linhas juntas
+          // Definindo larguras em porcentagem para caber no A4
+          widths: ['15%', '30%', '20%', '20%', '15%'],
+          body: tableBody
         },
-        layout: {
-          hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => '#aaaaaa',
-          vLineColor: () => '#aaaaaa',
-          fillColor: (rowIndex) => (rowIndex === 0) ? '#2c3e50' : null
-        },
+        layout: 'lightHorizontalLines',
         margin: [0, 0, 0, 20]
       });
     });
 
-    // 5. Configuração do documento PDF
+    // 4. Configuração do docDefinition para pdfmake
     const docDefinition = {
       pageSize: 'A4',
-      pageMargins: [40, 60, 40, 60],
-      header: function(currentPage, pageCount) {
-        return {
-          text: `Página ${currentPage} de ${pageCount}`,
-          alignment: 'right',
-          margin: [0, 10, 20, 0],
-          fontSize: 9
-        };
-      },
+      pageMargins: [40, 40, 40, 40],
       content: content,
       styles: {
         header: {
-          fontSize: 18,
+          fontSize: 22,
           bold: true,
-          alignment: 'center'
-        },
-        observacao: {
-          fontSize: 10,
-          italics: true,
           alignment: 'center'
         },
         subheader: {
-          fontSize: 14,
+          fontSize: 16,
           bold: true,
-          color: '#2c3e50'
-        },
-        tableTitle: {
-          fontSize: 12,
-          bold: true
+          margin: [0, 10, 0, 10]
         },
         tableHeader: {
           bold: true,
           fontSize: 10,
           color: 'white',
-          fillColor: '#2c3e50'
+          fillColor: '#2c3e50',
+          alignment: 'center'
         }
       },
       defaultStyle: {
@@ -573,7 +471,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       }
     };
 
-    // 6. Gerar o PDF
+    // 5. Geração do PDF com pdfmake
     const PdfPrinter = require('pdfmake');
     const fonts = {
       Helvetica: {
@@ -586,7 +484,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     
     const printer = new PdfPrinter(fonts);
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-
+    
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
     pdfDoc.pipe(res);
@@ -600,5 +498,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;
