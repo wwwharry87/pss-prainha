@@ -424,7 +424,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       content.push({
         text: `REGIÃO: ${regiaoData.regiao.toUpperCase()}`,
         style: 'regiaoHeader',
-        pageBreak: 'before'
+        //pageBreak: 'before'
       });
 
       // Iterar sobre cargos (ordem alfabética)
