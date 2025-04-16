@@ -359,7 +359,6 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
-// Endpoint para gerar o PDF dos resultados filtrados (ajustado)
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -367,102 +366,153 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // 1. Busca dos dados especificando os atributos necessários
+    // 1. Busca dos dados ordenados por região, cargo e nome do candidato
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao'],
       order: [
         ['regiao', 'ASC'],
+        ['cargo_nome', 'ASC'],
         ['candidato_nome', 'ASC']
       ],
       raw: true
     });
 
-    console.log('Dados brutos da view:', JSON.stringify(resultados.slice(0, 3), null, 2));
-
-    // 2. Processamento dos dados: agrupa por região e formata os campos
-    const grupos = {};
+    // 2. Agrupar hierarquicamente: Região → Cargo → Candidatos
+    const hierarquia = {};
     resultados.forEach(candidato => {
       const regiaoKey = candidato.regiao;
-      if (!grupos[regiaoKey]) {
-        grupos[regiaoKey] = { regiao: regiaoKey, candidatos: [] };
+      const cargoKey = candidato.cargo_nome;
+
+      if (!hierarquia[regiaoKey]) {
+        hierarquia[regiaoKey] = {
+          regiao: regiaoKey,
+          cargos: {}
+        };
       }
 
-      grupos[regiaoKey].candidatos.push({
+      if (!hierarquia[regiaoKey].cargos[cargoKey]) {
+        hierarquia[regiaoKey].cargos[cargoKey] = {
+          cargo: cargoKey,
+          candidatos: []
+        };
+      }
+
+      hierarquia[regiaoKey].cargos[cargoKey].candidatos.push({
         inscricao_id: candidato.inscricao_id,
-        nome: candidato.candidato_nome,
-        modalidade: isPCD(candidato.pcd) ? "PcD" : "AMPLA CONCORRÊNCIA",
-        nascimento: formatDate(candidato.data_nascimento),
-        cargo: candidato.cargo_nome
+        nome: candidato.candidato_nome + (isPCD(candidato.pcd) ? " - PcD" : ""),
+        nascimento: formatDate(candidato.data_nascimento)
       });
     });
 
-    // 3. Montagem do conteúdo do PDF utilizando pdfmake
+    // 3. Montar o conteúdo do PDF
     const content = [];
-    content.push({ text: 'RESULTADO FINAL - PSS 001/2025', style: 'header', margin: [0, 0, 0, 20] });
-    Object.values(grupos).forEach(grupo => {
-      // Cabeçalho do grupo com total de inscritos na região
-      content.push({ 
-        text: `Região: ${grupo.regiao.toUpperCase()} - ${grupo.candidatos.length} inscritos`, 
-        style: 'subheader',
-        margin: [0, 10, 0, 10]
-      });
+    content.push({ 
+      text: [
+        { text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', style: 'header' },
+        { text: '\nOs candidatos não identificados como PcD concorrem na modalidade de Ampla Concorrência', style: 'observacao' }
+      ],
+      margin: [0, 0, 0, 20],
+      alignment: 'center'
+    });
 
-      // Construção da tabela com 5 colunas:
-      // Número de Inscrição, Nome, Modalidade da Concorrência, Data de Nascimento, Cargo
-      const tableBody = [];
-      tableBody.push([
-        { text: 'Número de Inscrição', style: 'tableHeader', alignment: 'center' },
-        { text: 'Nome', style: 'tableHeader', alignment: 'left' },
-        { text: 'Modalidade da Concorrência', style: 'tableHeader', alignment: 'center' },
-        { text: 'Data de Nascimento', style: 'tableHeader', alignment: 'center' },
-        { text: 'Cargo', style: 'tableHeader', alignment: 'left' }
-      ]);
+    // Iterar sobre regiões (ordem alfabética)
+    Object.keys(hierarquia).sort().forEach(regiaoKey => {
+      const regiaoData = hierarquia[regiaoKey];
 
-      grupo.candidatos.forEach(candidato => {
-        tableBody.push([
-          { text: candidato.inscricao_id ? candidato.inscricao_id.toString() : 'N/A', alignment: 'center' },
-          { text: candidato.nome, alignment: 'left' },
-          { text: candidato.modalidade, alignment: 'center' },
-          { text: candidato.nascimento, alignment: 'center' },
-          { text: candidato.cargo || 'N/A', alignment: 'left' }
-        ]);
-      });
-
+      // Título da Região
       content.push({
-        table: {
-          headerRows: 1,
-          // Definindo larguras em porcentagem para caber no A4
-          widths: ['15%', '30%', '20%', '20%', '15%'],
-          body: tableBody
-        },
-        layout: 'lightHorizontalLines',
-        margin: [0, 0, 0, 20]
+        text: `REGIÃO: ${regiaoData.regiao.toUpperCase()}`,
+        style: 'regiaoHeader',
+        pageBreak: 'before'
+      });
+
+      // Iterar sobre cargos (ordem alfabética)
+      Object.keys(regiaoData.cargos).sort().forEach(cargoKey => {
+        const cargoData = regiaoData.cargos[cargoKey];
+
+        // Subtítulo do Cargo
+        content.push({
+          text: `Cargo: ${cargoData.cargo} (${cargoData.candidatos.length} candidatos)`,
+          style: 'cargoHeader',
+          margin: [0, 10, 0, 5]
+        });
+
+        // Tabela de Candidatos
+        const tableBody = [
+          [
+            { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
+            { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
+            { text: 'Data de Nascimento', style: 'tableHeader', alignment: 'center' }
+          ]
+        ];
+
+        // Adicionar candidatos (já ordenados por nome)
+        cargoData.candidatos.forEach(candidato => {
+          tableBody.push([
+            { text: candidato.inscricao_id || 'N/A', alignment: 'center' },
+            { text: candidato.nome, alignment: 'left' },
+            { text: candidato.nascimento, alignment: 'center' }
+          ]);
+        });
+
+        content.push({
+          table: {
+            headerRows: 1,
+            widths: ['20%', '60%', '20%'],
+            body: tableBody,
+            dontBreakRows: true
+          },
+          layout: {
+            hLineWidth: (i) => (i === 0 || i === tableBody.length) ? 1 : 0.5,
+            vLineWidth: () => 0.5,
+            hLineColor: () => '#444',
+            vLineColor: () => '#444',
+            fillColor: (rowIndex) => (rowIndex === 0) ? '#2c3e50' : null
+          },
+          margin: [0, 0, 0, 20]
+        });
       });
     });
 
-    // 4. Configuração do docDefinition para pdfmake
+    // 4. Configuração do PDF
     const docDefinition = {
       pageSize: 'A4',
-      pageMargins: [40, 40, 40, 40],
+      pageMargins: [40, 60, 40, 60],
+      header: (currentPage, pageCount) => ({
+        text: `Página ${currentPage} de ${pageCount}`,
+        alignment: 'right',
+        margin: [0, 10, 20, 0],
+        fontSize: 9
+      }),
       content: content,
       styles: {
         header: {
-          fontSize: 22,
+          fontSize: 18,
           bold: true,
-          alignment: 'center'
+          color: '#2c3e50'
         },
-        subheader: {
-          fontSize: 16,
+        observacao: {
+          fontSize: 10,
+          italics: true,
+          margin: [0, 5, 0, 0]
+        },
+        regiaoHeader: {
+          fontSize: 14,
           bold: true,
-          margin: [0, 10, 0, 10]
+          color: '#2c3e50',
+          margin: [0, 20, 0, 10]
+        },
+        cargoHeader: {
+          fontSize: 12,
+          bold: true,
+          color: '#34495e'
         },
         tableHeader: {
           bold: true,
           fontSize: 10,
           color: 'white',
-          fillColor: '#2c3e50',
-          alignment: 'center'
+          fillColor: '#2c3e50'
         }
       },
       defaultStyle: {
@@ -471,20 +521,18 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       }
     };
 
-    // 5. Geração do PDF com pdfmake
+    // 5. Gerar PDF
     const PdfPrinter = require('pdfmake');
-    const fonts = {
+    const printer = new PdfPrinter({
       Helvetica: {
         normal: 'Helvetica',
         bold: 'Helvetica-Bold',
         italics: 'Helvetica-Oblique',
         bolditalics: 'Helvetica-BoldOblique'
       }
-    };
-    
-    const printer = new PdfPrinter(fonts);
+    });
+
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
     pdfDoc.pipe(res);
@@ -492,12 +540,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
 
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ 
-      error: "Erro ao gerar PDF",
-      details: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
-
-
 module.exports = router;
