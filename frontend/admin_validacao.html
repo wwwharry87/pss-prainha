@@ -94,6 +94,20 @@
     .retificacao-btn {
       margin-top: 10px;
     }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1100;
+    }
+    .status-validado {
+      color: var(--success-color);
+      font-weight: bold;
+    }
+    .status-pendente {
+      color: var(--danger-color);
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -163,7 +177,8 @@
         <div class="modal-body">
           <div class="mb-3">
             <label for="justificativaRetificacao" class="form-label fw-bold">Justificativa:</label>
-            <textarea class="form-control" id="justificativaRetificacao" rows="5" placeholder="Descreva o motivo da retificação..."></textarea>
+            <textarea class="form-control" id="justificativaRetificacao" rows="5" placeholder="Descreva detalhadamente o motivo da retificação..." required></textarea>
+            <div class="invalid-feedback">Por favor, informe a justificativa para a retificação.</div>
           </div>
         </div>
         <div class="modal-footer bg-light">
@@ -274,39 +289,37 @@
         }
       }
       
-      // Campo de Tempo de Exercício – exibe apenas se o valor não for "0"
+      // Campo de Tempo de Exercício
       if(inscricao.doc_tempo_exercicio_path) {
-        let tempoVal = "";
+        let tempoVal = inscricao.tempo_exercicio || "";
+        let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
+        let pts = 0;
+        let iconeValidacao = "";
+        
         if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
-          tempoVal = inscricao.validacoes["doc_tempo_exercicio_path"];
-        } else {
-          tempoVal = inscricao.tempo_exercicio;
-        }
-        if(tempoVal && tempoVal !== "0") {
-          const tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
-          let pts = tempoPoints[tempoVal] || 0;
-          let iconeValidacao = "";
-          if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
-            if (tempoVal === "ate02") {
-              iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Até 02 anos"></i>';
-            } else if (tempoVal === "de02a04") {
-              iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="De 02 a 04 anos"></i>';
-            } else if (tempoVal === "de04a06") {
-              iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="De 04 a 06 anos"></i>';
-            } else if (tempoVal === "mais06") {
-              iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Mais de 06 anos"></i>';
-            }
+          if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
+            pts = tempoPoints[tempoVal] || 0;
+            iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
+          } else if (inscricao.validacoes["doc_tempo_exercicio_path"] === "rejeitado") {
+            iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
           }
-          docs.push({
-            label: `Tempo de Exercício (${pts} pts)`,
-            filename: inscricao.doc_tempo_exercicio_path,
-            campo: "doc_tempo_exercicio_path",
-            iconeValidacao: iconeValidacao
-          });
         }
+        
+        let tempoText = "";
+        if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
+        else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
+        else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
+        else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
+        
+        docs.push({
+          label: `Tempo de Exercício${tempoText} (${pts} pts)`,
+          filename: inscricao.doc_tempo_exercicio_path,
+          campo: "doc_tempo_exercicio_path",
+          iconeValidacao: iconeValidacao
+        });
       }
       
-      // Para campos que armazenam arrays: doc_cursos, doc_qualificacao, doc_pos
+      // Para campos que armazenam arrays
       const camposArray = ['doc_cursos', 'doc_qualificacao', 'doc_pos'];
       camposArray.forEach(campo => {
         if (inscricao[campo]) {
@@ -339,7 +352,7 @@
         }
       });
       
-      // Outros documentos (exceto identidade)
+      // Outros documentos
       const outrosCampos = [
         'doc_diploma_path', 'doc_especifico_path',
         'doc_especializacao_path', 'doc_mestrado_path', 'doc_doutorado_path',
@@ -364,6 +377,7 @@
     function exibirInscricoes(inscricoes) {
       const container = document.getElementById('inscriptionsSection');
       container.innerHTML = '';
+      
       if (inscricoes.length === 0) {
         container.innerHTML = `
           <div class="col-12">
@@ -375,41 +389,75 @@
         `;
         return;
       }
+      
       inscricoes.forEach((insc, index) => {
-        const disabled = insc.status === 'VALIDADO' ? 'disabled' : '';
-        const documentos = montarListaDocumentos(insc, disabled);
+        const isDisabled = insc.status === 'VALIDADO';
+        const documentos = montarListaDocumentos(insc, isDisabled);
         let docsHTML = "";
+        
         if (documentos.length > 0) {
           docsHTML += `<ul class="list-group list-group-flush">`;
           documentos.forEach((doc) => {
-            docsHTML += `
-              <li class="list-group-item document-item py-3">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>${doc.label}</strong>
-                    <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
-                    ${ disabled ? doc.iconeValidacao : "" }
+            if (isDisabled) {
+              // Exibe como texto quando validado
+              docsHTML += `
+                <li class="list-group-item document-item py-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <strong>${doc.label}</strong>
+                      <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
+                      ${doc.iconeValidacao}
+                    </div>
+                    <div class="status-validado">
+                      ${doc.iconeValidacao ? 'Validado' : 'Não validado'}
+                    </div>
                   </div>
-                  <div>
-                    <select class="form-select select-validacao" id="validacao_${insc.id}_${doc.campo}" ${disabled}>
-                      <option value="">Selecione</option>
-                      <option value="confirmado" ${insc.validacoes && insc.validacoes[doc.campo] === 'confirmado' ? 'selected' : ''}>Confirmado</option>
-                      <option value="rejeitado" ${insc.validacoes && insc.validacoes[doc.campo] === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
-                    </select>
+                </li>
+              `;
+            } else {
+              // Exibe com select quando pendente
+              docsHTML += `
+                <li class="list-group-item document-item py-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <strong>${doc.label}</strong>
+                      <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
+                    </div>
+                    <div>
+                      <select class="form-select select-validacao" id="validacao_${insc.id}_${doc.campo}">
+                        <option value="">Selecione</option>
+                        <option value="confirmado" ${insc.validacoes && insc.validacoes[doc.campo] === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                        <option value="rejeitado" ${insc.validacoes && insc.validacoes[doc.campo] === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-              </li>
-            `;
+                </li>
+              `;
+            }
           });
           docsHTML += `</ul>`;
         }
+        
         const cargoNome = insc.Cargo ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` : 'Não Informado';
         const pontuacao = insc.pontuacao || 0;
         
+        // Mostrar justificativa de retificação se existir
+        let justificativaHTML = '';
+        if (insc.justificativa_retificacao) {
+          justificativaHTML = `
+            <div class="alert alert-warning mt-3">
+              <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Justificativa da Retificação:</strong>
+              <div class="mt-2">${insc.justificativa_retificacao}</div>
+            </div>
+          `;
+        }
+        
         let botoesHTML = '';
-        if (insc.status === 'VALIDADO') {
+        if (isDisabled) {
           botoesHTML = `
-            <button class="btn btn-secondary btn-custom" disabled>Validação Confirmada</button>
+            <button class="btn btn-secondary btn-custom" disabled>
+              <i class="bi bi-check-circle-fill me-2"></i>Validação Confirmada
+            </button>
             <button class="btn btn-warning btn-custom retificacao-btn" onclick="abrirModalRetificacao(${insc.id})">
               <i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação
             </button>
@@ -429,7 +477,7 @@
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
               <h5 class="card-title mb-0 fw-bold">
                 <i class="bi bi-file-earmark-text me-2"></i>INSCRIÇÃO ${index + 1}
-                <span class="badge bg-${insc.status === 'VALIDADO' ? 'success' : 'warning'} ms-2">
+                <span class="badge bg-${isDisabled ? 'success' : 'warning'} ms-2">
                   ${insc.status || 'PENDENTE'}
                 </span>
               </h5>
@@ -438,6 +486,7 @@
               </span>
             </div>
             <div class="card-body">
+              ${justificativaHTML}
               <div class="row mb-3">
                 <div class="col-md-6">
                   <p><strong><i class="bi bi-briefcase me-2"></i>Cargo:</strong> ${cargoNome}</p>
@@ -450,9 +499,10 @@
               ${docsHTML}
               <div class="mt-4">
                 <label for="obs_${insc.id}" class="form-label fw-bold">
-                  <i class="bi bi-chat-left-text me-2"></i>Observações (opcional):
+                  <i class="bi bi-chat-left-text me-2"></i>Observações:
                 </label>
-                <textarea class="form-control" id="obs_${insc.id}" rows="3" placeholder="Insira comentários sobre a validação..." ${disabled}>${insc.observacoes || ''}</textarea>
+                <textarea class="form-control" id="obs_${insc.id}" rows="3" 
+                  ${isDisabled ? 'disabled' : ''}>${insc.observacoes || ''}</textarea>
               </div>
               <div class="d-grid mt-4 gap-2">
                 ${botoesHTML}
@@ -468,6 +518,7 @@
       const selects = document.querySelectorAll(`[id^="validacao_${inscricaoId}_"]`);
       const validacoes = {};
       let todosSelecionados = true;
+      
       selects.forEach(select => {
         if (!select.value) {
           todosSelecionados = false;
@@ -478,11 +529,14 @@
           validacoes[campo] = select.value;
         }
       });
+      
       if (!todosSelecionados) {
-        alert("Por favor, selecione uma opção para todos os documentos.");
+        showToast('warning', 'Por favor, selecione uma opção para todos os documentos.');
         return;
       }
-      const observacoes = document.getElementById(`obs_${inscricaoId}`) ? document.getElementById(`obs_${inscricaoId}`).value : '';
+      
+      const observacoes = document.getElementById(`obs_${inscricaoId}`)?.value || '';
+      
       try {
         const response = await fetch(`/api/admin/verificar-inscricao/${inscricaoId}`, {
           method: 'POST',
@@ -493,90 +547,122 @@
             observacoes
           })
         });
+        
         const result = await response.json();
+        
         if (response.ok) {
           showToast('success', result.message || 'Validação registrada com sucesso!');
           buscarCandidato();
         } else {
-          showToast('danger', result.error || 'Erro ao registrar validação');
+          throw new Error(result.error || 'Erro ao registrar validação');
         }
       } catch (error) {
         console.error("Erro ao enviar validação:", error);
-        showToast('danger', 'Erro ao enviar validação. Tente novamente.');
+        showToast('danger', error.message || 'Erro ao enviar validação. Tente novamente.');
       }
     }
   
-    // Variável global para armazenar o ID da inscrição que está sendo retificada
     let inscricaoRetificacaoId = null;
     
     function abrirModalRetificacao(inscricaoId) {
       inscricaoRetificacaoId = inscricaoId;
-      $('#justificativaRetificacao').val('');
+      $('#justificativaRetificacao').val('').removeClass('is-invalid');
       const modal = new bootstrap.Modal(document.getElementById('retificacaoModal'));
       modal.show();
     }
     
     async function confirmarRetificacao() {
       const justificativa = $('#justificativaRetificacao').val().trim();
+      
       if (!justificativa) {
-        alert('Por favor, informe a justificativa para a retificação.');
+        $('#justificativaRetificacao').addClass('is-invalid');
+        showToast('warning', 'Por favor, informe a justificativa para a retificação.');
         return;
       }
       
       try {
+        $('#confirmarRetificacao').prop('disabled', true).html(
+          '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processando...'
+        );
+
         const response = await fetch(`/api/admin/retificar-inscricao/${inscricaoRetificacaoId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ justificativa })
         });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Erro ao solicitar retificação');
-        }
-        
+
         const result = await response.json();
-        showToast('success', result.message || 'Retificação solicitada com sucesso!');
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Erro ao solicitar retificação');
+        }
+
+        showToast('success', result.message || 'Retificação registrada com sucesso!');
         
-        // Fechar o modal e recarregar os dados
         const modal = bootstrap.Modal.getInstance(document.getElementById('retificacaoModal'));
         modal.hide();
+        
         buscarCandidato();
         
       } catch (error) {
         console.error('Erro na retificação:', error);
         showToast('danger', error.message || 'Erro ao solicitar retificação');
+      } finally {
+        $('#confirmarRetificacao').prop('disabled', false).html('Confirmar Retificação');
       }
     }
   
     function showToast(type, message) {
+      const toastContainer = document.createElement('div');
+      toastContainer.className = `toast-container position-fixed bottom-0 end-0 p-3`;
+      
       const toast = document.createElement('div');
-      toast.className = `toast align-items-center text-white bg-${type} border-0 position-fixed bottom-0 end-0 m-3`;
-      toast.style.zIndex = '11';
+      toast.className = `toast align-items-center text-white bg-${type} border-0`;
       toast.setAttribute('role', 'alert');
       toast.setAttribute('aria-live', 'assertive');
       toast.setAttribute('aria-atomic', 'true');
+      
       toast.innerHTML = `
         <div class="d-flex">
           <div class="toast-body">${message}</div>
           <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
       `;
-      document.body.appendChild(toast);
-      const bsToast = new bootstrap.Toast(toast);
+      
+      toastContainer.appendChild(toast);
+      document.body.appendChild(toastContainer);
+      
+      const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 5000
+      });
+      
       bsToast.show();
-      setTimeout(() => { toast.remove(); }, 5000);
+      
+      toast.addEventListener('hidden.bs.toast', () => {
+        toastContainer.remove();
+      });
     }
   
     // Event Listeners
     document.getElementById('btnBuscar').addEventListener('click', buscarCandidato);
-    document.getElementById('cpfInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') buscarCandidato(); });
-    document.getElementById('logoutBtn').addEventListener('click', function() {
+    document.getElementById('cpfInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') buscarCandidato();
+    });
+    
+    document.getElementById('logoutBtn').addEventListener('click', () => {
       sessionStorage.clear();
       localStorage.clear();
       window.location.replace('/index.html');
     });
+    
     document.getElementById('confirmarRetificacao').addEventListener('click', confirmarRetificacao);
+    
+    $('#justificativaRetificacao').on('input', function() {
+      if ($(this).val().trim()) {
+        $(this).removeClass('is-invalid');
+      }
+    });
   </script>
 </body>
 </html>

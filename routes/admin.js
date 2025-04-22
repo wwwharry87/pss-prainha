@@ -10,31 +10,24 @@ const CargoRegiao = require('../models/CargoRegiao');
 const PDFDocument = require('pdfkit');
 const router = express.Router();
 
-// Helper para interpretar o valor da coluna PCD (considerando boolean e text)
+// Helper para interpretar o valor da coluna PCD
 function isPCD(val) {
   if (typeof val === 'boolean') return val;
   if (typeof val === 'string') return val.toLowerCase() === 'true';
   return false;
 }
 
-// Helper para formatar datas em texto 'YYYY-MM-DD'
+// Helper para formatar datas
 function formatDate(dateStr) {
   if (!dateStr) return 'N/A';
-  
-  // Extrai componentes diretamente da string
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (match) {
     return `${match[3]}/${match[2]}/${match[1]}`;
   }
-  
   return 'Data inválida';
 }
 
-// ======================================================================
-// 1. Endpoints já existentes (Dashboard, Inscrições, Candidato, etc.)
-// ======================================================================
-
-// Endpoint para dados do dashboard (usando a view)
+// Endpoint para dados do dashboard
 router.get('/dashboard-data', async (req, res) => {
   try {
     const [porCargo, porRegiao, totais] = await Promise.all([
@@ -77,7 +70,7 @@ router.get('/dashboard-data', async (req, res) => {
   }
 });
 
-// Endpoint para listagem de inscrições (usando a view)
+// Endpoint para listagem de inscrições
 router.get('/inscricoes', async (req, res) => {
   try {
     const { cargo, regiao, status, search } = req.query;
@@ -105,12 +98,11 @@ router.get('/inscricoes', async (req, res) => {
   }
 });
 
-// Endpoint para buscar candidato relacionado com as inscrições 
+// Endpoint para buscar candidato com inscrições
 router.get('/candidato/:cpf', async (req, res) => {
   try {
     const cpf = req.params.cpf.replace(/\D/g, '');
     
-    // Usa o alias "Inscricaos" conforme definido na associação do modelo
     const candidato = await Candidato.findOne({
       where: { cpf },
       include: [{
@@ -124,10 +116,8 @@ router.get('/candidato/:cpf', async (req, res) => {
       return res.status(404).json({ error: 'Candidato não encontrado' });
     }
 
-    // Acesse as inscrições através do alias definido, 'Inscricaos'
     const inscricoes = candidato.Inscricaos || [];
     
-    // Para cada inscrição, consulta a tabela de validações
     const inscricoesComValidacao = await Promise.all(inscricoes.map(async (insc) => {
       const validacao = await ValidacaoInscricao.findOne({
         where: { inscricao_id: insc.id },
@@ -137,7 +127,8 @@ router.get('/candidato/:cpf', async (req, res) => {
       return {
         ...insc.get({ plain: true }),
         pontuacao: validacao ? validacao.pontuacao : 0,
-        validacoes: validacao ? JSON.parse(validacao.validacoes) : {}
+        validacoes: validacao ? JSON.parse(validacao.validacoes) : {},
+        justificativa_retificacao: validacao ? validacao.justificativa_retificacao : null
       };
     }));
 
@@ -148,31 +139,7 @@ router.get('/candidato/:cpf', async (req, res) => {
         email: candidato.email,
         pcd: candidato.pcd
       },
-      inscricoes: inscricoesComValidacao.map(insc => ({
-        id: insc.id,
-        zona: insc.zona,
-        tempo_exercicio: insc.tempo_exercicio,
-        pontuacao: insc.pontuacao,
-        validacoes: insc.validacoes,
-        Cargo: insc.Cargo,
-        doc_identidade_path: insc.doc_identidade_path,
-        doc_escolaridade_path: insc.doc_escolaridade_path,
-        doc_diploma_path: insc.doc_diploma_path,
-        doc_especifico_path: insc.doc_especifico_path,
-        doc_especializacao_path: insc.doc_especializacao_path,
-        doc_mestrado_path: insc.doc_mestrado_path,
-        doc_doutorado_path: insc.doc_doutorado_path,
-        doc_plano_aula_path: insc.doc_plano_aula_path,
-        doc_certificado_path: insc.doc_certificado_path,
-        doc_certificado_fundamental_path: insc.doc_certificado_fundamental_path,
-        doc_certificado_medio_path: insc.doc_certificado_medio_path,
-        doc_certificado_fund_completo_path: insc.doc_certificado_fund_completo_path,
-        doc_cursos: insc.doc_cursos,
-        doc_pos: insc.doc_pos,
-        doc_qualificacao: insc.doc_qualificacao,
-        doc_tempo_exercicio_path: insc.doc_tempo_exercicio_path,
-        status: insc.status
-      }))
+      inscricoes: inscricoesComValidacao
     });
   } catch (error) {
     console.error("Erro ao buscar candidato:", error);
@@ -180,83 +147,60 @@ router.get('/candidato/:cpf', async (req, res) => {
   }
 });
 
-// Endpoint para validação de inscrição (calcula pontuação e atualiza o status)
+// Endpoint para validação de inscrição
+// Endpoint para validação de inscrição (completo e corrigido)
 router.post('/verificar-inscricao/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, validacoes, observacoes } = req.body;
     
+    // Verifica se a inscrição existe
     const inscricao = await Inscricao.findByPk(id);
     if (!inscricao) {
-      return res.status(404).json({ message: 'Inscrição não encontrada' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Inscrição não encontrada' 
+      });
     }
     
-    // Buscar o cargo para obter o nível
+    // Busca o cargo relacionado
     const cargo = await Cargo.findByPk(inscricao.cargo_id);
-    
-    let pontuacaoFinal = 0;
-    
-    // Campos fixos
-    if (validacoes["doc_escolaridade_path"] === "confirmado") {
-      pontuacaoFinal += 50;
-    }
-    if (validacoes["doc_certificado_fundamental_path"] === "confirmado") {
-      pontuacaoFinal += 10;
-    }
-    if (validacoes["doc_certificado_medio_path"] === "confirmado") {
-      pontuacaoFinal += 10;
-    }
-    if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") {
-      pontuacaoFinal += 10;
+    if (!cargo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cargo associado à inscrição não encontrado'
+      });
     }
     
-    // Tempo de Exercício
-    if (validacoes["doc_tempo_exercicio_path"]) {
-      const tempoPoints = { "ate02": 5, "de02a04": 10, "de04a06": 15, "mais06": 20 };
-      pontuacaoFinal += tempoPoints[validacoes["doc_tempo_exercicio_path"]] || 0;
-    }
+    // Calcula a pontuação total
+    let pontuacaoFinal = calcularPontuacao(inscricao, cargo, validacoes);
     
-    // Para cargos de Nível FUNDAMENTAL: doc_cursos (limite 4)
-    if (cargo && cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && validacoes["doc_cursos"] === "confirmado") {
-      try {
-        const cursos = JSON.parse(inscricao.doc_cursos);
-        let count = Math.min(cursos.length, 4);
-        pontuacaoFinal += count * 5;
-      } catch (e) {
-        console.error("Erro ao parsear doc_cursos", e);
-      }
-    }
-    
-    // Para cargos de Nível SUPERIOR: doc_pos e doc_qualificacao (limite 2 cada)
-    if (cargo && cargo.nivel.toUpperCase().includes("SUPERIOR")) {
-      if (validacoes["doc_pos"] === "confirmado") {
-        try {
-          const pos = JSON.parse(inscricao.doc_pos);
-          let count = Math.min(pos.length, 2);
-          pontuacaoFinal += count * 5;
-        } catch (e) {
-          console.error("Erro ao parsear doc_pos", e);
-        }
-      }
-      if (validacoes["doc_qualificacao"] === "confirmado") {
-        try {
-          const qual = JSON.parse(inscricao.doc_qualificacao);
-          let count = Math.min(qual.length, 2);
-          pontuacaoFinal += count * 5;
-        } catch (e) {
-          console.error("Erro ao parsear doc_qualificacao", e);
-        }
-      }
-    }
-    
-    await ValidacaoInscricao.upsert({
-      inscricao_id: id,
-      validacoes: JSON.stringify(validacoes),
-      observacoes,
-      status,
-      pontuacao: pontuacaoFinal
+    // Busca validação existente
+    const validacaoExistente = await ValidacaoInscricao.findOne({ 
+      where: { inscricao_id: id } 
     });
+
+    // Prepara dados para atualização/criação
+    const dadosValidacao = {
+      validacoes: JSON.stringify(validacoes),
+      observacoes: observacoes || null,
+      status: 'VALIDADO',
+      pontuacao: pontuacaoFinal,
+      // Mantém justificativa se existir, senão define como null
+      justificativa_retificacao: validacaoExistente?.justificativa_retificacao || null
+    };
+
+    // Atualiza ou cria a validação
+    if (validacaoExistente) {
+      await validacaoExistente.update(dadosValidacao);
+    } else {
+      await ValidacaoInscricao.create({
+        inscricao_id: id,
+        ...dadosValidacao
+      });
+    }
     
+    // Atualiza status da inscrição
     await inscricao.update({ status: 'VALIDADO' });
     
     return res.json({ 
@@ -267,15 +211,125 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
     
   } catch (error) {
     console.error("Erro na validação:", error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ 
+      success: false,
+      error: error.message,
+      message: 'Erro ao processar validação'
+    });
   }
 });
 
-// ---------------------------------------------------------------
-// NOVOS ENDPOINTS: RESULTADOS COM FILTROS E GERAÇÃO DO PDF
-// ---------------------------------------------------------------
+// Função auxiliar para cálculo de pontuação
+function calcularPontuacao(inscricao, cargo, validacoes) {
+  let pontuacao = 0;
+  
+  // Pontos por documentos obrigatórios
+  if (validacoes["doc_escolaridade_path"] === "confirmado") pontuacao += 50;
+  if (validacoes["doc_certificado_fundamental_path"] === "confirmado") pontuacao += 10;
+  if (validacoes["doc_certificado_medio_path"] === "confirmado") pontuacao += 10;
+  if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") pontuacao += 10;
+  
+  // Tempo de exercício (corrigido)
+  if (validacoes["doc_tempo_exercicio_path"] === "confirmado" && inscricao.tempo_exercicio) {
+    const tempoPoints = { "ate02": 5, "de02a04": 10, "de04a06": 15, "mais06": 20 };
+    pontuacao += tempoPoints[inscricao.tempo_exercicio] || 0;
+  }
+  
+  // Cursos complementares (para cargos de nível fundamental)
+  if (cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && validacoes["doc_cursos"] === "confirmado") {
+    try {
+      const cursos = JSON.parse(inscricao.doc_cursos || '[]');
+      pontuacao += Math.min(cursos.length, 4) * 5;
+    } catch (e) {
+      console.error("Erro ao processar cursos complementares:", e);
+    }
+  }
+  
+  // Pós-graduações e qualificações (para cargos de nível superior)
+  if (cargo.nivel.toUpperCase().includes("SUPERIOR")) {
+    if (validacoes["doc_pos"] === "confirmado") {
+      try {
+        const pos = JSON.parse(inscricao.doc_pos || '[]');
+        pontuacao += Math.min(pos.length, 2) * 5;
+      } catch (e) {
+        console.error("Erro ao processar pós-graduações:", e);
+      }
+    }
+    
+    if (validacoes["doc_qualificacao"] === "confirmado") {
+      try {
+        const qual = JSON.parse(inscricao.doc_qualificacao || '[]');
+        pontuacao += Math.min(qual.length, 2) * 5;
+      } catch (e) {
+        console.error("Erro ao processar qualificações:", e);
+      }
+    }
+  }
+  
+  return pontuacao;
+}
 
-// Endpoint para obter os resultados (agrupados por cargo/região e com dados das vagas)
+// Endpoint para retificação de inscrição (completo e corrigido)
+router.post('/retificar-inscricao/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { justificativa } = req.body;
+    
+    // Validação da justificativa
+    if (!justificativa || justificativa.trim() === '') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'A justificativa é obrigatória para solicitar retificação.' 
+      });
+    }
+
+    // Verifica se a inscrição existe
+    const inscricao = await Inscricao.findByPk(id);
+    if (!inscricao) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Inscrição não encontrada.' 
+      });
+    }
+
+    // Busca a validação existente
+    const validacao = await ValidacaoInscricao.findOne({ 
+      where: { inscricao_id: id } 
+    });
+    
+    if (!validacao) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Validação não encontrada para esta inscrição.' 
+      });
+    }
+    
+    // Atualiza a validação com a justificativa
+    await validacao.update({
+      justificativa_retificacao: justificativa.trim(),
+      status: 'PENDENTE'
+      // Mantém os outros campos (pontuação, validações) para histórico
+    });
+    
+    // Atualiza o status da inscrição
+    await inscricao.update({ status: 'PENDENTE' });
+    
+    return res.json({ 
+      success: true, 
+      message: 'Retificação registrada com sucesso. A validação deverá ser refeita.',
+      justificativa: justificativa.trim() 
+    });
+    
+  } catch (error) {
+    console.error('Erro na retificação:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: error.message,
+      message: 'Erro ao processar retificação'
+    });
+  }
+});
+// Endpoint para resultados do PSS
 router.get('/resultados-pss', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -283,7 +337,6 @@ router.get('/resultados-pss', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // Buscar os candidatos na DashboardView
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       order: [
@@ -294,7 +347,6 @@ router.get('/resultados-pss', async (req, res) => {
       raw: true
     });
 
-    // Agrupar os resultados por cargo e região
     const grupos = {};
     resultados.forEach(candidato => {
       const chave = `${candidato.cargo_nome}|${candidato.regiao}`;
@@ -308,7 +360,6 @@ router.get('/resultados-pss', async (req, res) => {
       grupos[chave].candidatos.push(candidato);
     });
 
-    // Buscar vagas disponíveis (juntando com o modelo Cargo para obter o nome)
     const vagas = await CargoRegiao.findAll({
       include: [{
         model: Cargo,
@@ -319,15 +370,13 @@ router.get('/resultados-pss', async (req, res) => {
       nest: true
     });
 
-    // Para cada grupo, adiciona informações de vagas e classifica os candidatos,
-    // usando a função isPCD para determinar corretamente o valor.
     const resultadoFinal = Object.values(grupos).map(grupo => {
-      // Procura a vaga que corresponda ao cargo e região
       const vaga = vagas.find(v =>
         v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
       );
       const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
       const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
+      
       grupo.candidatos = grupo.candidatos.map((candidato, index) => {
         let situacao = 'Não Classificado';
         if (index < vagas_imediatas) {
@@ -341,7 +390,6 @@ router.get('/resultados-pss', async (req, res) => {
           ...candidato,
           classificacao: index + 1,
           situacao,
-          // Inclui o valor convertido usando isPCD para ser utilizado no PDF e na tela
           pcd: isPCD(candidato.pcd) || isPCD(candidato.PCD)
         };
       });
@@ -359,6 +407,7 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
+// Endpoint para gerar PDF de resultados
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
@@ -366,7 +415,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
 
-    // 1. Busca dos dados ordenados por região, cargo e nome do candidato
     const resultados = await DashboardView.findAll({
       where: whereDashboard,
       attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao'],
@@ -378,7 +426,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       raw: true
     });
 
-    // 2. Agrupar hierarquicamente: Região → Cargo → Candidatos
     const hierarquia = {};
     resultados.forEach(candidato => {
       const regiaoKey = candidato.regiao;
@@ -405,7 +452,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       });
     });
 
-    // 3. Montar o conteúdo do PDF
     const content = [];
     content.push({ 
       text: [
@@ -416,29 +462,23 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       alignment: 'center'
     });
 
-    // Iterar sobre regiões (ordem alfabética)
     Object.keys(hierarquia).sort().forEach(regiaoKey => {
       const regiaoData = hierarquia[regiaoKey];
 
-      // Título da Região
       content.push({
         text: `REGIÃO: ${regiaoData.regiao.toUpperCase()}`,
         style: 'regiaoHeader',
-        //pageBreak: 'before'
       });
 
-      // Iterar sobre cargos (ordem alfabética)
       Object.keys(regiaoData.cargos).sort().forEach(cargoKey => {
         const cargoData = regiaoData.cargos[cargoKey];
 
-        // Subtítulo do Cargo
         content.push({
           text: `Cargo: ${cargoData.cargo} (${cargoData.candidatos.length} candidatos)`,
           style: 'cargoHeader',
           margin: [0, 10, 0, 5]
         });
 
-        // Tabela de Candidatos
         const tableBody = [
           [
             { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
@@ -447,7 +487,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
           ]
         ];
 
-        // Adicionar candidatos (já ordenados por nome)
         cargoData.candidatos.forEach(candidato => {
           tableBody.push([
             { text: candidato.inscricao_id || 'N/A', alignment: 'center' },
@@ -475,7 +514,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       });
     });
 
-    // 4. Configuração do PDF
     const docDefinition = {
       pageSize: 'A4',
       pageMargins: [40, 60, 40, 60],
@@ -521,7 +559,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
       }
     };
 
-    // 5. Gerar PDF
     const PdfPrinter = require('pdfmake');
     const printer = new PdfPrinter({
       Helvetica: {
@@ -540,34 +577,6 @@ router.get('/resultados-pss/pdf', async (req, res) => {
 
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Após o endpoint de verificar-inscricao
-router.post('/retificar-inscricao/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { justificativa } = req.body;
-    
-    // Verifica existência da validação
-    const validacao = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
-    if (!validacao) {
-      return res.status(404).json({ message: 'Validação não encontrada para esta inscrição.' });
-    }
-    
-    // Atualiza justificativa e status para permitir nova apreciação
-    await validacao.update({
-      justificativa_retificacao: justificativa,
-      status: 'PENDENTE'    // ou 'RETIFICADO', conforme sua regra de negócio
-    });
-    
-    // Também volta o status da inscrição para PENDENTE
-    await Inscricao.update({ status: 'PENDENTE' }, { where: { id } });
-    
-    res.json({ success: true, message: 'Retificação registrada com sucesso.' });
-  } catch (error) {
-    console.error('Erro na retificação:', error);
     res.status(500).json({ error: error.message });
   }
 });
