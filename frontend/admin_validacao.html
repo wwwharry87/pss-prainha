@@ -91,6 +91,9 @@
     .validation-icon {
       margin-left: 8px;
     }
+    .retificacao-btn {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -144,6 +147,28 @@
         </div>
         <div class="modal-footer bg-light">
           <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal para Retificação -->
+  <div class="modal fade" id="retificacaoModal" tabindex="-1" aria-labelledby="retificacaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="retificacaoModalLabel">Solicitar Retificação</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="justificativaRetificacao" class="form-label fw-bold">Justificativa:</label>
+            <textarea class="form-control" id="justificativaRetificacao" rows="5" placeholder="Descreva o motivo da retificação..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-custom" id="confirmarRetificacao">Confirmar Retificação</button>
         </div>
       </div>
     </div>
@@ -217,8 +242,6 @@
       `;
     }
   
-    // Função para montar a lista de documentos da inscrição (excluindo identidade).
-    // Ajuste para o campo "Tempo de Exercício": se o valor (ou o campo tempo_exercicio) for "0", não exibe esse documento.
     function montarListaDocumentos(inscricao, disabled) {
       const pontosDocumento = {
         "doc_escolaridade_path": 50,
@@ -253,14 +276,12 @@
       
       // Campo de Tempo de Exercício – exibe apenas se o valor não for "0"
       if(inscricao.doc_tempo_exercicio_path) {
-        // Se houver validação, usar ela; senão, usar o valor do campo tempo_exercicio
         let tempoVal = "";
         if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
           tempoVal = inscricao.validacoes["doc_tempo_exercicio_path"];
         } else {
           tempoVal = inscricao.tempo_exercicio;
         }
-        // Se o valor for "0", trata como nulo e não exibe este campo
         if(tempoVal && tempoVal !== "0") {
           const tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
           let pts = tempoPoints[tempoVal] || 0;
@@ -384,11 +405,23 @@
         }
         const cargoNome = insc.Cargo ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` : 'Não Informado';
         const pontuacao = insc.pontuacao || 0;
-        const botaoValidar = insc.status === 'VALIDADO'
-          ? `<button class="btn btn-secondary btn-custom" disabled>Validação Confirmada</button>`
-          : `<button class="btn btn-success btn-custom" onclick="submitValidacao(${insc.id})">
-                <i class="bi bi-check-circle-fill me-2"></i>Confirmar Validação
-             </button>`;
+        
+        let botoesHTML = '';
+        if (insc.status === 'VALIDADO') {
+          botoesHTML = `
+            <button class="btn btn-secondary btn-custom" disabled>Validação Confirmada</button>
+            <button class="btn btn-warning btn-custom retificacao-btn" onclick="abrirModalRetificacao(${insc.id})">
+              <i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação
+            </button>
+          `;
+        } else {
+          botoesHTML = `
+            <button class="btn btn-success btn-custom" onclick="submitValidacao(${insc.id})">
+              <i class="bi bi-check-circle-fill me-2"></i>Confirmar Validação
+            </button>
+          `;
+        }
+        
         const card = document.createElement('div');
         card.className = 'col-12';
         card.innerHTML = `
@@ -419,10 +452,10 @@
                 <label for="obs_${insc.id}" class="form-label fw-bold">
                   <i class="bi bi-chat-left-text me-2"></i>Observações (opcional):
                 </label>
-                <textarea class="form-control" id="obs_${insc.id}" rows="3" placeholder="Insira comentários sobre a validação...">${insc.observacoes || ''}</textarea>
+                <textarea class="form-control" id="obs_${insc.id}" rows="3" placeholder="Insira comentários sobre a validação..." ${disabled}>${insc.observacoes || ''}</textarea>
               </div>
-              <div class="d-grid mt-4">
-                ${botaoValidar}
+              <div class="d-grid mt-4 gap-2">
+                ${botoesHTML}
               </div>
             </div>
           </div>
@@ -473,6 +506,49 @@
       }
     }
   
+    // Variável global para armazenar o ID da inscrição que está sendo retificada
+    let inscricaoRetificacaoId = null;
+    
+    function abrirModalRetificacao(inscricaoId) {
+      inscricaoRetificacaoId = inscricaoId;
+      $('#justificativaRetificacao').val('');
+      const modal = new bootstrap.Modal(document.getElementById('retificacaoModal'));
+      modal.show();
+    }
+    
+    async function confirmarRetificacao() {
+      const justificativa = $('#justificativaRetificacao').val().trim();
+      if (!justificativa) {
+        alert('Por favor, informe a justificativa para a retificação.');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/admin/retificar-inscricao/${inscricaoRetificacaoId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ justificativa })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Erro ao solicitar retificação');
+        }
+        
+        const result = await response.json();
+        showToast('success', result.message || 'Retificação solicitada com sucesso!');
+        
+        // Fechar o modal e recarregar os dados
+        const modal = bootstrap.Modal.getInstance(document.getElementById('retificacaoModal'));
+        modal.hide();
+        buscarCandidato();
+        
+      } catch (error) {
+        console.error('Erro na retificação:', error);
+        showToast('danger', error.message || 'Erro ao solicitar retificação');
+      }
+    }
+  
     function showToast(type, message) {
       const toast = document.createElement('div');
       toast.className = `toast align-items-center text-white bg-${type} border-0 position-fixed bottom-0 end-0 m-3`;
@@ -492,6 +568,7 @@
       setTimeout(() => { toast.remove(); }, 5000);
     }
   
+    // Event Listeners
     document.getElementById('btnBuscar').addEventListener('click', buscarCandidato);
     document.getElementById('cpfInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') buscarCandidato(); });
     document.getElementById('logoutBtn').addEventListener('click', function() {
@@ -499,6 +576,7 @@
       localStorage.clear();
       window.location.replace('/index.html');
     });
+    document.getElementById('confirmarRetificacao').addEventListener('click', confirmarRetificacao);
   </script>
 </body>
 </html>

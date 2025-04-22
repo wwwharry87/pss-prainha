@@ -543,4 +543,33 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Após o endpoint de verificar-inscricao
+router.post('/retificar-inscricao/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { justificativa } = req.body;
+    
+    // Verifica existência da validação
+    const validacao = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
+    if (!validacao) {
+      return res.status(404).json({ message: 'Validação não encontrada para esta inscrição.' });
+    }
+    
+    // Atualiza justificativa e status para permitir nova apreciação
+    await validacao.update({
+      justificativa_retificacao: justificativa,
+      status: 'PENDENTE'    // ou 'RETIFICADO', conforme sua regra de negócio
+    });
+    
+    // Também volta o status da inscrição para PENDENTE
+    await Inscricao.update({ status: 'PENDENTE' }, { where: { id } });
+    
+    res.json({ success: true, message: 'Retificação registrada com sucesso.' });
+  } catch (error) {
+    console.error('Erro na retificação:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
