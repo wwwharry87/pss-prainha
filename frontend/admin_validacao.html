@@ -258,121 +258,125 @@
     }
   
     function montarListaDocumentos(inscricao, disabled) {
-      const pontosDocumento = {
-        "doc_escolaridade_path": 50,
-        "doc_certificado_fundamental_path": 10,
-        "doc_certificado_medio_path": 10,
-        "doc_certificado_fund_completo_path": 10
-      };
-      const docs = [];
-      
-      // Campos fixos com pontuação
-      for (const campo in pontosDocumento) {
-        if (inscricao[campo]) {
-          let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
-          label = label.charAt(0).toUpperCase() + label.slice(1);
-          let pts = pontosDocumento[campo];
+  const pontosDocumento = {
+    "doc_escolaridade_path": 50,
+    "doc_certificado_fundamental_path": 10,
+    "doc_certificado_medio_path": 10,
+    "doc_certificado_fund_completo_path": 10
+  };
+  const docs = [];
+  
+  // Campos fixos com pontuação
+  for (const campo in pontosDocumento) {
+    if (inscricao[campo]) {
+      let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
+      label = label.charAt(0).toUpperCase() + label.slice(1);
+      let pts = pontosDocumento[campo];
+      let iconeValidacao = "";
+      if (inscricao.validacoes && inscricao.validacoes[campo]) {
+        if (inscricao.validacoes[campo] === "confirmado") {
+          iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
+        } else if (inscricao.validacoes[campo] === "rejeitado") {
+          iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
+        }
+      }
+      docs.push({
+        label: `${label} (${pts} pts)`,
+        filename: inscricao[campo],
+        campo: campo,
+        iconeValidacao: iconeValidacao
+      });
+    }
+  }
+  
+  // Campo de Tempo de Exercício
+  if(inscricao.doc_tempo_exercicio_path) {
+    let tempoVal = inscricao.tempo_exercicio || "";
+    let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
+    let pts = 0;
+    let iconeValidacao = "";
+    
+    if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
+      if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
+        pts = tempoPoints[tempoVal] || 0;
+        iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
+      } else if (inscricao.validacoes["doc_tempo_exercicio_path"] === "rejeitado") {
+        iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
+      }
+    }
+    
+    let tempoText = "";
+    if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
+    else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
+    else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
+    else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
+    
+    docs.push({
+      label: `Tempo de Exercício${tempoText} (${pts} pts)`,
+      filename: inscricao.doc_tempo_exercicio_path,
+      campo: "doc_tempo_exercicio_path",
+      iconeValidacao: iconeValidacao
+    });
+  }
+  
+  // Para campos que armazenam arrays (cursos, qualificações, pós)
+  const camposArray = ['doc_cursos', 'doc_qualificacao', 'doc_pos'];
+  camposArray.forEach(campo => {
+    if (inscricao[campo]) {
+      try {
+        const arquivos = JSON.parse(inscricao[campo]);
+        arquivos.forEach((filename, i) => {
+          const pts = 5;
+          let labelTexto = "";
+          if(campo === 'doc_cursos') labelTexto = "Curso complementar";
+          else if(campo === 'doc_qualificacao') labelTexto = "Qualificação";
+          else if(campo === 'doc_pos') labelTexto = "Pós-graduação";
+          
+          // Verifica validação individual para cada item
+          const chaveValidacao = `${campo}_${i}`;
           let iconeValidacao = "";
-          if (inscricao.validacoes && inscricao.validacoes[campo]) {
-            if (inscricao.validacoes[campo] === "confirmado") {
+          if (inscricao.validacoes && inscricao.validacoes[chaveValidacao]) {
+            if (inscricao.validacoes[chaveValidacao] === "confirmado") {
               iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
-            } else if (inscricao.validacoes[campo] === "rejeitado") {
+            } else if (inscricao.validacoes[chaveValidacao] === "rejeitado") {
               iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
             }
           }
+          
           docs.push({
-            label: `${label} (${pts} pts)`,
-            filename: inscricao[campo],
-            campo: campo,
+            label: `${labelTexto} ${i+1} (5 pts)`,
+            filename: filename,
+            campo: chaveValidacao,
             iconeValidacao: iconeValidacao
           });
-        }
-      }
-      
-      // Campo de Tempo de Exercício
-      if(inscricao.doc_tempo_exercicio_path) {
-        let tempoVal = inscricao.tempo_exercicio || "";
-        let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
-        let pts = 0;
-        let iconeValidacao = "";
-        
-        if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
-          if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
-            pts = tempoPoints[tempoVal] || 0;
-            iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
-          } else if (inscricao.validacoes["doc_tempo_exercicio_path"] === "rejeitado") {
-            iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
-          }
-        }
-        
-        let tempoText = "";
-        if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
-        else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
-        else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
-        else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
-        
-        docs.push({
-          label: `Tempo de Exercício${tempoText} (${pts} pts)`,
-          filename: inscricao.doc_tempo_exercicio_path,
-          campo: "doc_tempo_exercicio_path",
-          iconeValidacao: iconeValidacao
         });
+      } catch(e) {
+        console.error(`Erro ao parsear ${campo}:`, e);
       }
-      
-      // Para campos que armazenam arrays
-      const camposArray = ['doc_cursos', 'doc_qualificacao', 'doc_pos'];
-      camposArray.forEach(campo => {
-        if (inscricao[campo]) {
-          try {
-            const arquivos = JSON.parse(inscricao[campo]);
-            arquivos.forEach((filename, i) => {
-              const pts = 5;
-              let labelTexto = "";
-              if(campo === 'doc_cursos') labelTexto = "Curso complementar";
-              else if(campo === 'doc_qualificacao') labelTexto = "Qualificação";
-              else if(campo === 'doc_pos') labelTexto = "Pós-graduação";
-              let iconeValidacao = "";
-              if (inscricao.validacoes && inscricao.validacoes[campo]) {
-                if (inscricao.validacoes[campo] === "confirmado") {
-                  iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
-                } else if (inscricao.validacoes[campo] === "rejeitado") {
-                  iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
-                }
-              }
-              docs.push({
-                label: `${labelTexto} ${i+1} (5 pts)`,
-                filename: filename,
-                campo: campo,
-                iconeValidacao: iconeValidacao
-              });
-            });
-          } catch(e) {
-            console.error(`Erro ao parsear ${campo}:`, e);
-          }
-        }
-      });
-      
-      // Outros documentos
-      const outrosCampos = [
-        'doc_diploma_path', 'doc_especifico_path',
-        'doc_especializacao_path', 'doc_mestrado_path', 'doc_doutorado_path',
-        'doc_plano_aula_path'
-      ];
-      outrosCampos.forEach(campo => {
-        if (inscricao[campo]) {
-          let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
-          label = label.charAt(0).toUpperCase() + label.slice(1);
-          docs.push({
-            label: label,
-            filename: inscricao[campo],
-            campo: campo,
-            iconeValidacao: ""
-          });
-        }
-      });
-      
-      return docs;
     }
+  });
+  
+  // Outros documentos
+  const outrosCampos = [
+    'doc_diploma_path', 'doc_especifico_path',
+    'doc_especializacao_path', 'doc_mestrado_path', 'doc_doutorado_path',
+    'doc_plano_aula_path'
+  ];
+  outrosCampos.forEach(campo => {
+    if (inscricao[campo]) {
+      let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
+      label = label.charAt(0).toUpperCase() + label.slice(1);
+      docs.push({
+        label: label,
+        filename: inscricao[campo],
+        campo: campo,
+        iconeValidacao: ""
+      });
+    }
+  });
+  
+  return docs;
+}
   
     function exibirInscricoes(inscricoes) {
       const container = document.getElementById('inscriptionsSection');

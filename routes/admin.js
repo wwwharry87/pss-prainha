@@ -219,7 +219,7 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
   }
 });
 
-// Função auxiliar para cálculo de pontuação
+// Função auxiliar para cálculo de pontuação (ajustada)
 function calcularPontuacao(inscricao, cargo, validacoes) {
   let pontuacao = 0;
   
@@ -229,17 +229,22 @@ function calcularPontuacao(inscricao, cargo, validacoes) {
   if (validacoes["doc_certificado_medio_path"] === "confirmado") pontuacao += 10;
   if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") pontuacao += 10;
   
-  // Tempo de exercício (corrigido)
+  // Tempo de exercício
   if (validacoes["doc_tempo_exercicio_path"] === "confirmado" && inscricao.tempo_exercicio) {
     const tempoPoints = { "ate02": 5, "de02a04": 10, "de04a06": 15, "mais06": 20 };
     pontuacao += tempoPoints[inscricao.tempo_exercicio] || 0;
   }
   
   // Cursos complementares (para cargos de nível fundamental)
-  if (cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && validacoes["doc_cursos"] === "confirmado") {
+  if (cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && inscricao.doc_cursos) {
     try {
       const cursos = JSON.parse(inscricao.doc_cursos || '[]');
-      pontuacao += Math.min(cursos.length, 4) * 5;
+      // Verifica se há validação específica para cada curso
+      const cursosValidados = cursos.filter((_, index) => {
+        const chave = `doc_cursos_${index}`;
+        return validacoes[chave] === "confirmado";
+      });
+      pontuacao += Math.min(cursosValidados.length, 4) * 5;
     } catch (e) {
       console.error("Erro ao processar cursos complementares:", e);
     }
@@ -247,19 +252,27 @@ function calcularPontuacao(inscricao, cargo, validacoes) {
   
   // Pós-graduações e qualificações (para cargos de nível superior)
   if (cargo.nivel.toUpperCase().includes("SUPERIOR")) {
-    if (validacoes["doc_pos"] === "confirmado") {
+    if (inscricao.doc_pos) {
       try {
         const pos = JSON.parse(inscricao.doc_pos || '[]');
-        pontuacao += Math.min(pos.length, 2) * 5;
+        const posValidados = pos.filter((_, index) => {
+          const chave = `doc_pos_${index}`;
+          return validacoes[chave] === "confirmado";
+        });
+        pontuacao += Math.min(posValidados.length, 2) * 5;
       } catch (e) {
         console.error("Erro ao processar pós-graduações:", e);
       }
     }
     
-    if (validacoes["doc_qualificacao"] === "confirmado") {
+    if (inscricao.doc_qualificacao) {
       try {
         const qual = JSON.parse(inscricao.doc_qualificacao || '[]');
-        pontuacao += Math.min(qual.length, 2) * 5;
+        const qualValidados = qual.filter((_, index) => {
+          const chave = `doc_qualificacao_${index}`;
+          return validacoes[chave] === "confirmado";
+        });
+        pontuacao += Math.min(qualValidados.length, 2) * 5;
       } catch (e) {
         console.error("Erro ao processar qualificações:", e);
       }
