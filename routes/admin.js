@@ -228,6 +228,11 @@ function calcularPontuacao(inscricao, cargo, validacoes) {
   if (validacoes["doc_certificado_fundamental_path"] === "confirmado") pontuacao += 10;
   if (validacoes["doc_certificado_medio_path"] === "confirmado") pontuacao += 10;
   if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") pontuacao += 10;
+
+  // Pontuação para plano de aula (se aplicável)
+  if (validacoes["doc_plano_aula_path"] === "confirmado") {
+    pontuacao += 0; // Adiciona pontos para plano de aula confirmado
+  }
   
   // Tempo de exercício
   if (validacoes["doc_tempo_exercicio_path"] === "confirmado" && inscricao.tempo_exercicio) {
