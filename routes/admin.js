@@ -148,13 +148,11 @@ router.get('/candidato/:cpf', async (req, res) => {
 });
 
 // Endpoint para validação de inscrição
-// Endpoint para validação de inscrição (completo e corrigido)
 router.post('/verificar-inscricao/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, validacoes, observacoes } = req.body;
     
-    // Verifica se a inscrição existe
     const inscricao = await Inscricao.findByPk(id);
     if (!inscricao) {
       return res.status(404).json({ 
@@ -163,7 +161,6 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
       });
     }
     
-    // Busca o cargo relacionado
     const cargo = await Cargo.findByPk(inscricao.cargo_id);
     if (!cargo) {
       return res.status(400).json({
@@ -172,25 +169,20 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
       });
     }
     
-    // Calcula a pontuação total
     let pontuacaoFinal = calcularPontuacao(inscricao, cargo, validacoes);
     
-    // Busca validação existente
     const validacaoExistente = await ValidacaoInscricao.findOne({ 
       where: { inscricao_id: id } 
     });
 
-    // Prepara dados para atualização/criação
     const dadosValidacao = {
       validacoes: JSON.stringify(validacoes),
       observacoes: observacoes || null,
       status: 'VALIDADO',
       pontuacao: pontuacaoFinal,
-      // Mantém justificativa se existir, senão define como null
       justificativa_retificacao: validacaoExistente?.justificativa_retificacao || null
     };
 
-    // Atualiza ou cria a validação
     if (validacaoExistente) {
       await validacaoExistente.update(dadosValidacao);
     } else {
@@ -200,7 +192,6 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
       });
     }
     
-    // Atualiza status da inscrição
     await inscricao.update({ status: 'VALIDADO' });
     
     return res.json({ 
@@ -208,7 +199,6 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
       message: 'Validação registrada com sucesso', 
       pontuacao: pontuacaoFinal 
     });
-    
   } catch (error) {
     console.error("Erro na validação:", error);
     return res.status(500).json({ 
@@ -219,81 +209,61 @@ router.post('/verificar-inscricao/:id', async (req, res) => {
   }
 });
 
-// Função auxiliar para cálculo de pontuação (ajustada)
 function calcularPontuacao(inscricao, cargo, validacoes) {
   let pontuacao = 0;
-  
-  // Pontos por documentos obrigatórios
-  if (validacoes["doc_escolaridade_path"] === "confirmado") pontuacao += 50;
-  if (validacoes["doc_certificado_fundamental_path"] === "confirmado") pontuacao += 10;
-  if (validacoes["doc_certificado_medio_path"] === "confirmado") pontuacao += 10;
-  if (validacoes["doc_certificado_fund_completo_path"] === "confirmado") pontuacao += 10;
 
-  // Pontuação para plano de aula (se aplicável)
-  if (validacoes["doc_plano_aula_path"] === "confirmado") {
-    pontuacao += 0; // Adiciona pontos para plano de aula confirmado
-  }
-  
-  // Tempo de exercício
-  if (validacoes["doc_tempo_exercicio_path"] === "confirmado" && inscricao.tempo_exercicio) {
-    const tempoPoints = { "ate02": 5, "de02a04": 10, "de04a06": 15, "mais06": 20 };
+  // 1. Documentos obrigatórios (escolaridade, certificados)
+  if (validacoes['doc_escolaridade_path'] === 'confirmado') pontuacao += 50;
+  if (validacoes['doc_certificado_fundamental_path'] === 'confirmado') pontuacao += 10;
+  if (validacoes['doc_certificado_medio_path'] === 'confirmado') pontuacao += 10;
+  if (validacoes['doc_certificado_fund_completo_path'] === 'confirmado') pontuacao += 10;
+
+  // 2. Tempo de exercício (5 a 20 pts)
+  if (validacoes['doc_tempo_exercicio_path'] === 'confirmado' && inscricao.tempo_exercicio) {
+    const tempoPoints = { ate02: 5, de02a04: 10, de04a06: 15, mais06: 20 };
     pontuacao += tempoPoints[inscricao.tempo_exercicio] || 0;
   }
-  
-  // Cursos complementares (para cargos de nível fundamental)
-  if (cargo.nivel.toUpperCase().includes("FUNDAMENTAL") && inscricao.doc_cursos) {
-    try {
-      const cursos = JSON.parse(inscricao.doc_cursos || '[]');
-      // Verifica se há validação específica para cada curso
-      const cursosValidados = cursos.filter((_, index) => {
-        const chave = `doc_cursos_${index}`;
-        return validacoes[chave] === "confirmado";
-      });
-      pontuacao += Math.min(cursosValidados.length, 4) * 5;
-    } catch (e) {
-      console.error("Erro ao processar cursos complementares:", e);
-    }
-  }
-  
-  // Pós-graduações e qualificações (para cargos de nível superior)
-  if (cargo.nivel.toUpperCase().includes("SUPERIOR")) {
-    if (inscricao.doc_pos) {
-      try {
-        const pos = JSON.parse(inscricao.doc_pos || '[]');
-        const posValidados = pos.filter((_, index) => {
-          const chave = `doc_pos_${index}`;
-          return validacoes[chave] === "confirmado";
-        });
-        pontuacao += Math.min(posValidados.length, 2) * 5;
-      } catch (e) {
-        console.error("Erro ao processar pós-graduações:", e);
-      }
-    }
-    
+
+  // 3. Apenas para nível superior
+  if (cargo.nivel.toUpperCase().includes('SUPERIOR')) {
+    // 3.1 Qualificações (5 pts cada, sem limite)
     if (inscricao.doc_qualificacao) {
       try {
         const qual = JSON.parse(inscricao.doc_qualificacao || '[]');
-        const qualValidados = qual.filter((_, index) => {
-          const chave = `doc_qualificacao_${index}`;
-          return validacoes[chave] === "confirmado";
+        qual.forEach((_, idx) => {
+          if (validacoes[`doc_qualificacao_${idx}`] === 'confirmado') pontuacao += 5;
         });
-        pontuacao += Math.min(qualValidados.length, 2) * 5;
       } catch (e) {
-        console.error("Erro ao processar qualificações:", e);
+        console.error('Erro ao processar qualificações:', e);
       }
     }
+
+    // 3.2 Pós-graduações (5 pts cada, sem limite)
+    if (inscricao.doc_pos) {
+      try {
+        const pos = JSON.parse(inscricao.doc_pos || '[]');
+        pos.forEach((_, idx) => {
+          if (validacoes[`doc_pos_${idx}`] === 'confirmado') pontuacao += 5;
+        });
+      } catch (e) {
+        console.error('Erro ao processar pós-graduações:', e);
+      }
+    }
+
+    // 3.3 Mestrado/Doutorado (5 pts cada, adicionais às pós-graduações)
+    if (validacoes['doc_mestrado_path'] === 'confirmado') pontuacao += 5;
+    if (validacoes['doc_doutorado_path'] === 'confirmado') pontuacao += 5;
   }
-  
+
   return pontuacao;
 }
 
-// Endpoint para retificação de inscrição (completo e corrigido)
+// Endpoint para retificação de inscrição
 router.post('/retificar-inscricao/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { justificativa } = req.body;
     
-    // Validação da justificativa
     if (!justificativa || justificativa.trim() === '') {
       return res.status(400).json({ 
         success: false,
@@ -301,7 +271,6 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
       });
     }
 
-    // Verifica se a inscrição existe
     const inscricao = await Inscricao.findByPk(id);
     if (!inscricao) {
       return res.status(404).json({ 
@@ -310,7 +279,6 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
       });
     }
 
-    // Busca a validação existente
     const validacao = await ValidacaoInscricao.findOne({ 
       where: { inscricao_id: id } 
     });
@@ -322,14 +290,11 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
       });
     }
     
-    // Atualiza a validação com a justificativa
     await validacao.update({
       justificativa_retificacao: justificativa.trim(),
       status: 'PENDENTE'
-      // Mantém os outros campos (pontuação, validações) para histórico
     });
     
-    // Atualiza o status da inscrição
     await inscricao.update({ status: 'PENDENTE' });
     
     return res.json({ 
@@ -337,7 +302,6 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
       message: 'Retificação registrada com sucesso. A validação deverá ser refeita.',
       justificativa: justificativa.trim() 
     });
-    
   } catch (error) {
     console.error('Erro na retificação:', error);
     return res.status(500).json({ 

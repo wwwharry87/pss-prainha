@@ -282,7 +282,7 @@
         }
       });
 
-      // Outros documentos (sem repetir Plano de Aula)
+        // Outros documentos (sem repetir Plano de Aula)
       const outrosCampos = [
         'doc_diploma_path', 'doc_especifico_path',
         'doc_especializacao_path', 'doc_mestrado_path', 'doc_doutorado_path'
@@ -291,9 +291,26 @@
         if (inscricao[campo]) {
           let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
           label = label.charAt(0).toUpperCase() + label.slice(1);
-          docs.push({ label, filename: inscricao[campo], campo, iconeValidacao: '' });
+          
+          // Adicionar pontos para mestrado/doutorado
+          if (campo === 'doc_mestrado_path' || campo === 'doc_doutorado_path') {
+            label += ` (5 pts)`;
+          }
+          
+          let iconeValidacao = "";
+          if (inscricao.validacoes && inscricao.validacoes[campo]) {
+            if (inscricao.validacoes[campo] === "confirmado") {
+              iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
+            } else if (inscricao.validacoes[campo] === "rejeitado") {
+              iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
+            }
+          }
+          
+          docs.push({ label, filename: inscricao[campo], campo, iconeValidacao });
         }
       });
+
+
 
       return docs;
     }
