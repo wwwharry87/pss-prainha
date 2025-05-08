@@ -265,7 +265,7 @@ async function fetchResultados(cargo, regiao) {
     WHERE 1=1
       ${whereCargo}
       ${whereRegiao}
-    ORDER BY cr.zona, car.nome, v.pontuacao DESC, c.data_nascimento ASC
+    ORDER BY cr.zona, car.nome, v.pontuacao DESC, c.data_nascimento desc
   `;
   return sequelize.query(sql, { type: sequelize.QueryTypes.SELECT });
 }
