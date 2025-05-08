@@ -7,27 +7,49 @@ const Cargo = require('../models/Cargo');
 const Candidato = require('../models/Candidato');
 const ValidacaoInscricao = require('../models/ValidacaoInscricao');
 const CargoRegiao = require('../models/CargoRegiao');
-const PDFDocument = require('pdfkit');
+const path = require('path');
+const PdfPrinter = require('pdfmake/src/printer');
 const router = express.Router();
 
-// Helper para interpretar o valor da coluna PCD
+// Mapear fontes para pdfmake
+const fonts = {
+  Roboto: {
+    normal: path.join(__dirname, '../fonts/Roboto/Roboto-Regular.ttf'),
+    bold: path.join(__dirname,  '../fonts/Roboto/Roboto-Bold.ttf'),
+    italics: path.join(__dirname,  '../fonts/Roboto/Roboto-Italic.ttf'),
+    bolditalics: path.join(__dirname,  '../fonts/Roboto/Roboto-BoldItalic.ttf')
+  }
+};
+
+// Helper: converte valor para boolean PCD
 function isPCD(val) {
   if (typeof val === 'boolean') return val;
   if (typeof val === 'string') return val.toLowerCase() === 'true';
   return false;
 }
 
-// Helper para formatar datas
+// Helper: calcula idade a partir da data de nascimento
+function calcularIdade(dataNascimento) {
+  if (!dataNascimento) return null;
+  const hoje = new Date();
+  const nasc = new Date(dataNascimento);
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
+// Helper: formata data YYYY-MM-DD → DD/MM/YYYY
 function formatDate(dateStr) {
   if (!dateStr) return 'N/A';
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (match) {
     return `${match[3]}/${match[2]}/${match[1]}`;
   }
-  return 'Data inválida';
+  return dateStr;
 }
 
-// Endpoint para dados do dashboard
+// 1) Dashboard data
 router.get('/dashboard-data', async (req, res) => {
   try {
     const [porCargo, porRegiao, totais] = await Promise.all([
@@ -38,16 +60,11 @@ router.get('/dashboard-data', async (req, res) => {
           [fn('SUM', sequelize.literal("CASE WHEN status = 'VALIDADO' THEN 1 ELSE 0 END")), 'validados'],
           [fn('SUM', sequelize.literal("CASE WHEN status = 'PENDENTE' THEN 1 ELSE 0 END")), 'pendentes']
         ],
-        group: ['cargo_nome'],
-        raw: true
+        group: ['cargo_nome'], raw: true
       }),
       DashboardView.findAll({
-        attributes: [
-          'regiao',
-          [fn('COUNT', col('inscricao_id')), 'total']
-        ],
-        group: ['regiao'],
-        raw: true
+        attributes: ['regiao', [fn('COUNT', col('inscricao_id')), 'total']],
+        group: ['regiao'], raw: true
       }),
       DashboardView.findAll({
         attributes: [
@@ -58,24 +75,22 @@ router.get('/dashboard-data', async (req, res) => {
         raw: true
       })
     ]);
-
     res.json({
       porCargo,
       porRegiao,
       totais: totais[0] || { total: 0, validados: 0, pendentes: 0 }
     });
   } catch (error) {
-    console.error("Erro ao gerar dashboard:", error);
+    console.error('Erro ao gerar dashboard:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Endpoint para listagem de inscrições
+// 2) Listagem de inscrições
 router.get('/inscricoes', async (req, res) => {
   try {
     const { cargo, regiao, status, search } = req.query;
     const where = {};
-    
     if (cargo) where.cargo_nome = { [Op.iLike]: `%${cargo}%` };
     if (regiao) where.regiao = { [Op.iLike]: `%${regiao}%` };
     if (status) where.status = { [Op.iLike]: `%${status}%` };
@@ -85,50 +100,31 @@ router.get('/inscricoes', async (req, res) => {
         { candidato_cpf: { [Op.iLike]: `%${search}%` } }
       ];
     }
-
-    const inscricoes = await DashboardView.findAll({
-      where,
-      order: [['data_inscricao', 'DESC']],
-    });
-
+    const inscricoes = await DashboardView.findAll({ where, order: [['data_inscricao', 'DESC']] });
     res.json(inscricoes);
   } catch (error) {
-    console.error("Erro ao buscar inscrições:", error);
+    console.error('Erro ao buscar inscrições:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Endpoint para buscar candidato com inscrições
+// 3) Buscar candidato e validações
 router.get('/candidato/:cpf', async (req, res) => {
   try {
     const cpf = req.params.cpf.replace(/\D/g, '');
-    
     const candidato = await Candidato.findOne({
       where: { cpf },
-      include: [{
-        model: Inscricao,
-        as: 'Inscricaos',
-        include: [Cargo]
-      }]
+      include: [{ model: Inscricao, as: 'Inscricaos', include: [Cargo] }]
     });
+    if (!candidato) return res.status(404).json({ error: 'Candidato não encontrado' });
 
-    if (!candidato) {
-      return res.status(404).json({ error: 'Candidato não encontrado' });
-    }
-
-    const inscricoes = candidato.Inscricaos || [];
-    
-    const inscricoesComValidacao = await Promise.all(inscricoes.map(async (insc) => {
-      const validacao = await ValidacaoInscricao.findOne({
-        where: { inscricao_id: insc.id },
-        raw: true
-      });
-      
+    const detalhados = await Promise.all(candidato.Inscricaos.map(async insc => {
+      const val = await ValidacaoInscricao.findOne({ where: { inscricao_id: insc.id }, raw: true });
       return {
         ...insc.get({ plain: true }),
-        pontuacao: validacao ? validacao.pontuacao : 0,
-        validacoes: validacao ? JSON.parse(validacao.validacoes) : {},
-        justificativa_retificacao: validacao ? validacao.justificativa_retificacao : null
+        pontuacao: val?.pontuacao || 0,
+        validacoes: val ? JSON.parse(val.validacoes) : {},
+        justificativa_retificacao: val?.justificativa_retificacao || null
       };
     }));
 
@@ -139,427 +135,301 @@ router.get('/candidato/:cpf', async (req, res) => {
         email: candidato.email,
         pcd: candidato.pcd
       },
-      inscricoes: inscricoesComValidacao
+      inscricoes: detalhados
     });
   } catch (error) {
-    console.error("Erro ao buscar candidato:", error);
+    console.error('Erro ao buscar candidato:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Endpoint para validação de inscrição
+// 4) Validar inscrição
 router.post('/verificar-inscricao/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, validacoes, observacoes } = req.body;
-    
-    const inscricao = await Inscricao.findByPk(id);
-    if (!inscricao) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Inscrição não encontrada' 
-      });
-    }
-    
-    const cargo = await Cargo.findByPk(inscricao.cargo_id);
-    if (!cargo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cargo associado à inscrição não encontrado'
-      });
-    }
-    
-    let pontuacaoFinal = calcularPontuacao(inscricao, cargo, validacoes);
-    
-    const validacaoExistente = await ValidacaoInscricao.findOne({ 
-      where: { inscricao_id: id } 
-    });
+    const { validacoes, observacoes } = req.body;
+    const insc = await Inscricao.findByPk(id);
+    if (!insc) return res.status(404).json({ success: false, message: 'Inscrição não encontrada' });
+    const cargo = await Cargo.findByPk(insc.cargo_id);
+    if (!cargo) return res.status(400).json({ success: false, message: 'Cargo associado não encontrado' });
+    const pontuacao = calcularPontuacao(insc, cargo, validacoes);
 
-    const dadosValidacao = {
+    let valRec = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
+    const dados = {
       validacoes: JSON.stringify(validacoes),
       observacoes: observacoes || null,
       status: 'VALIDADO',
-      pontuacao: pontuacaoFinal,
-      justificativa_retificacao: validacaoExistente?.justificativa_retificacao || null
+      pontuacao,
+      justificativa_retificacao: valRec?.justificativa_retificacao || null
     };
+    if (valRec) await valRec.update(dados);
+    else await ValidacaoInscricao.create({ inscricao_id: id, ...dados });
+    await insc.update({ status: 'VALIDADO' });
 
-    if (validacaoExistente) {
-      await validacaoExistente.update(dadosValidacao);
-    } else {
-      await ValidacaoInscricao.create({
-        inscricao_id: id,
-        ...dadosValidacao
-      });
-    }
-    
-    await inscricao.update({ status: 'VALIDADO' });
-    
-    return res.json({ 
-      success: true, 
-      message: 'Validação registrada com sucesso', 
-      pontuacao: pontuacaoFinal 
-    });
+    res.json({ success: true, message: 'Validação registrada com sucesso', pontuacao });
   } catch (error) {
-    console.error("Erro na validação:", error);
-    return res.status(500).json({ 
-      success: false,
-      error: error.message,
-      message: 'Erro ao processar validação'
-    });
+    console.error('Erro na validação:', error);
+    res.status(500).json({ success: false, message: 'Erro ao processar validação', error: error.message });
   }
 });
 
-function calcularPontuacao(inscricao, cargo, validacoes) {
-  let pontuacao = 0;
-
-  // 1. Documentos obrigatórios (escolaridade, certificados)
-  if (validacoes['doc_escolaridade_path'] === 'confirmado') pontuacao += 50;
-  if (validacoes['doc_certificado_fundamental_path'] === 'confirmado') pontuacao += 10;
-  if (validacoes['doc_certificado_medio_path'] === 'confirmado') pontuacao += 10;
-  if (validacoes['doc_certificado_fund_completo_path'] === 'confirmado') pontuacao += 10;
-
-  // 2. Tempo de exercício (5 a 20 pts)
-  if (validacoes['doc_tempo_exercicio_path'] === 'confirmado' && inscricao.tempo_exercicio) {
-    const tempoPoints = { ate02: 5, de02a04: 10, de04a06: 15, mais06: 20 };
-    pontuacao += tempoPoints[inscricao.tempo_exercicio] || 0;
+// Helper: calcular pontuação
+function calcularPontuacao(insc, cargo, validacoes) {
+  let pts = 0;
+  if (validacoes['doc_escolaridade_path'] === 'confirmado') pts += 50;
+  ['fundamental','medio','fund_completo'].forEach(k => {
+    if (validacoes[`doc_certificado_${k}_path`] === 'confirmado') pts += 10;
+  });
+  if (validacoes['doc_tempo_exercicio_path'] === 'confirmado' && insc.tempo_exercicio) {
+    const m = { ate02: 5, de02a04: 10, de04a06: 15, mais06: 20 };
+    pts += m[insc.tempo_exercicio] || 0;
   }
-
-  // 3. Apenas para nível superior
   if (cargo.nivel.toUpperCase().includes('SUPERIOR')) {
-    // 3.1 Qualificações (5 pts cada, sem limite)
-    if (inscricao.doc_qualificacao) {
-      try {
-        const qual = JSON.parse(inscricao.doc_qualificacao || '[]');
-        qual.forEach((_, idx) => {
-          if (validacoes[`doc_qualificacao_${idx}`] === 'confirmado') pontuacao += 5;
-        });
-      } catch (e) {
-        console.error('Erro ao processar qualificações:', e);
-      }
-    }
-
-    // 3.2 Pós-graduações (5 pts cada, sem limite)
-    if (inscricao.doc_pos) {
-      try {
-        const pos = JSON.parse(inscricao.doc_pos || '[]');
-        pos.forEach((_, idx) => {
-          if (validacoes[`doc_pos_${idx}`] === 'confirmado') pontuacao += 5;
-        });
-      } catch (e) {
-        console.error('Erro ao processar pós-graduações:', e);
-      }
-    }
-
-    // 3.3 Mestrado/Doutorado (5 pts cada, adicionais às pós-graduações)
-    if (validacoes['doc_mestrado_path'] === 'confirmado') pontuacao += 5;
-    if (validacoes['doc_doutorado_path'] === 'confirmado') pontuacao += 5;
+    try {
+      JSON.parse(insc.doc_qualificacao || '[]').forEach((_, i) => {
+        if (validacoes[`doc_qualificacao_${i}`] === 'confirmado') pts += 5;
+      });
+      JSON.parse(insc.doc_pos || '[]').forEach((_, i) => {
+        if (validacoes[`doc_pos_${i}`] === 'confirmado') pts += 5;
+      });
+    } catch {}
+    if (validacoes['doc_mestrado_path'] === 'confirmado') pts += 5;
+    if (validacoes['doc_doutorado_path'] === 'confirmado') pts += 5;
   }
-
-  return pontuacao;
+  return pts;
 }
 
-// Endpoint para retificação de inscrição
+// 5) Retificar inscrição
 router.post('/retificar-inscricao/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { justificativa } = req.body;
-    
-    if (!justificativa || justificativa.trim() === '') {
-      return res.status(400).json({ 
-        success: false,
-        message: 'A justificativa é obrigatória para solicitar retificação.' 
-      });
+    if (!justificativa?.trim()) {
+      return res.status(400).json({ success: false, message: 'Justificativa obrigatória' });
     }
-
-    const inscricao = await Inscricao.findByPk(id);
-    if (!inscricao) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Inscrição não encontrada.' 
-      });
+    const insc = await Inscricao.findByPk(id);
+    const valRec = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
+    if (!insc || !valRec) {
+      return res.status(404).json({ success: false, message: 'Registro não encontrado' });
     }
-
-    const validacao = await ValidacaoInscricao.findOne({ 
-      where: { inscricao_id: id } 
-    });
-    
-    if (!validacao) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Validação não encontrada para esta inscrição.' 
-      });
-    }
-    
-    await validacao.update({
-      justificativa_retificacao: justificativa.trim(),
-      status: 'PENDENTE'
-    });
-    
-    await inscricao.update({ status: 'PENDENTE' });
-    
-    return res.json({ 
-      success: true, 
-      message: 'Retificação registrada com sucesso. A validação deverá ser refeita.',
-      justificativa: justificativa.trim() 
-    });
+    await valRec.update({ justificativa_retificacao: justificativa.trim(), status: 'PENDENTE' });
+    await insc.update({ status: 'PENDENTE' });
+    res.json({ success: true, message: 'Retificação registrada com sucesso' });
   } catch (error) {
     console.error('Erro na retificação:', error);
-    return res.status(500).json({ 
-      success: false,
-      error: error.message,
-      message: 'Erro ao processar retificação'
-    });
+    res.status(500).json({ success: false, message: 'Erro ao processar retificação', error: error.message });
   }
 });
-// Endpoint para resultados do PSS
-router.get('/resultados-pss', async (req, res) => {
+
+// 6) Filtros para frontend
+router.get('/resultados-pss/filtros', async (req, res) => {
   try {
-    const { cargo, regiao } = req.query;
-    const whereDashboard = { status: 'PENDENTE' };
-    if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
-    if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
-
-    const resultados = await DashboardView.findAll({
-      where: whereDashboard,
-      order: [
-        ['cargo_nome', 'ASC'],
-        ['regiao', 'ASC'],
-        ['pontuacao', 'DESC']
-      ],
-      raw: true
-    });
-
-    const grupos = {};
-    resultados.forEach(candidato => {
-      const chave = `${candidato.cargo_nome}|${candidato.regiao}`;
-      if (!grupos[chave]) {
-        grupos[chave] = {
-          cargo: candidato.cargo_nome,
-          regiao: candidato.regiao,
-          candidatos: []
-        };
-      }
-      grupos[chave].candidatos.push(candidato);
-    });
-
-    const vagas = await CargoRegiao.findAll({
-      include: [{
-        model: Cargo,
-        as: 'cargo',
-        attributes: ['nome']
-      }],
-      raw: true,
-      nest: true
-    });
-
-    const resultadoFinal = Object.values(grupos).map(grupo => {
-      const vaga = vagas.find(v =>
-        v.cargo && v.cargo.nome === grupo.cargo && v.zona === grupo.regiao
-      );
-      const vagas_imediatas = vaga ? parseInt(vaga.vagas_imediatas, 10) : 0;
-      const reserva_pcd = vaga && vaga.reserva_pcd ? 1 : 0;
-      
-      grupo.candidatos = grupo.candidatos.map((candidato, index) => {
-        let situacao = 'Não Classificado';
-        if (index < vagas_imediatas) {
-          situacao = 'Classificado';
-        } else if (isPCD(candidato.pcd) || isPCD(candidato.PCD)) {
-          if (index < (vagas_imediatas + reserva_pcd)) {
-            situacao = 'Classificado (Reserva PCD)';
-          }
-        }
-        return {
-          ...candidato,
-          classificacao: index + 1,
-          situacao,
-          pcd: isPCD(candidato.pcd) || isPCD(candidato.PCD)
-        };
-      });
-      return {
-        ...grupo,
-        vagas_imediatas,
-        reserva_pcd
-      };
-    });
-
-    res.json(resultadoFinal);
+    const [cargos, regioes] = await Promise.all([
+      Cargo.findAll({ attributes: ['nome'], group: ['nome'], raw: true }),
+      CargoRegiao.findAll({ attributes: ['zona'], group: ['zona'], raw: true })
+    ]);
+    res.json({ cargos: cargos.map(c => c.nome), regioes: regioes.map(r => r.zona) });
   } catch (error) {
-    console.error("Erro ao buscar resultados:", error);
+    console.error('Erro ao buscar filtros:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Endpoint para gerar PDF de resultados
+// Internal: fetch resultados brutos
+async function fetchResultados(cargo, regiao) {
+  const whereCargo = cargo ? `AND car.nome ILIKE '%${cargo.replace(/'/g,"''")}%'` : '';
+  const whereRegiao = regiao ? `AND cr.zona ILIKE '%${regiao.replace(/'/g,"''")}%'` : '';
+  const sql = `
+    WITH validacoes_recentes AS (
+      SELECT DISTINCT ON (inscricao_id) *
+      FROM validacoes_inscricoes_backup
+      WHERE status = 'VALIDADO'
+      ORDER BY inscricao_id, "updatedAt" DESC
+    )
+    SELECT
+      i.id AS inscricao_id,
+      c.nome AS candidato_nome,
+      c.cpf AS candidato_cpf,
+      c.data_nascimento,
+      c.pcd,
+      car.nome AS cargo_nome,
+      cr.zona AS regiao,
+      v.pontuacao,
+      cr.vagas_imediatas,
+      cr.reserva_pcd
+    FROM inscricoes i
+    JOIN candidatos c ON i.candidato_id = c.id
+    JOIN cargos car ON i.cargo_id = car.id
+    JOIN cargo_regioes cr ON cr.cargo_id = car.id AND cr.zona = i.zona
+    JOIN validacoes_recentes v ON v.inscricao_id = i.id
+    WHERE 1=1
+      ${whereCargo}
+      ${whereRegiao}
+    ORDER BY cr.zona, car.nome, v.pontuacao DESC, c.data_nascimento ASC
+  `;
+  return sequelize.query(sql, { type: sequelize.QueryTypes.SELECT });
+}
+
+// 7) Resultados JSON com distribuição de vagas PcD
+router.get('/resultados-pss', async (req, res) => {
+  try {
+    const { cargo, regiao } = req.query;
+    const raw = await fetchResultados(cargo, regiao);
+    const grupos = {};
+    raw.forEach(item => {
+      const key = `${item.cargo_nome}|${item.regiao}`;
+      if (!grupos[key]) {
+        grupos[key] = {
+          cargo: item.cargo_nome,
+          regiao: item.regiao,
+          vagas_imediatas: item.vagas_imediatas || 0,
+          reserva_pcd: item.reserva_pcd || 0,
+          lista: []
+        };
+      }
+      grupos[key].lista.push(item);
+    });
+    const resultadoFinal = Object.values(grupos).map(g => {
+      const sorted = g.lista.sort((a,b) => {
+        if (b.pontuacao !== a.pontuacao) return b.pontuacao - a.pontuacao;
+        return calcularIdade(a.data_nascimento) - calcularIdade(b.data_nascimento);
+      });
+      const geraisCount = Math.max(g.vagas_imediatas - g.reserva_pcd, 0);
+      const gerais = sorted.filter(c => !isPCD(c.pcd)).slice(0, geraisCount);
+      const reservadas = g.reserva_pcd > 0
+        ? sorted.filter(c => isPCD(c.pcd) && c.pontuacao >= 50).slice(0, g.reserva_pcd)
+        : [];
+      const others = sorted.filter(c =>
+        !gerais.some(x => x.inscricao_id === c.inscricao_id) &&
+        !reservadas.some(x => x.inscricao_id === c.inscricao_id)
+      );
+      const finalList = [...gerais, ...reservadas, ...others];
+      return {
+        cargo: g.cargo,
+        regiao: g.regiao,
+        vagas_imediatas: g.vagas_imediatas,
+        reserva_pcd: g.reserva_pcd,
+        candidatos: finalList.map((cand, idx) => ({
+          ...cand,
+          idade: calcularIdade(cand.data_nascimento),
+          classificacao: idx + 1,
+          situacao: idx < gerais.length
+            ? 'Classificado'
+            : (idx < gerais.length + reservadas.length
+                ? 'Classificado (Reserva PCD)'
+                : 'Não Classificado')
+        }))
+      };
+    });
+    res.json(resultadoFinal);
+  } catch (error) {
+    console.error('Erro ao buscar resultados:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8) Geração de PDF
 router.get('/resultados-pss/pdf', async (req, res) => {
   try {
     const { cargo, regiao } = req.query;
-    const whereDashboard = { status: 'PENDENTE' };
-    if (cargo) whereDashboard.cargo_nome = { [Op.iLike]: `%${cargo}%` };
-    if (regiao) whereDashboard.regiao = { [Op.iLike]: `%${regiao}%` };
-
-    const resultados = await DashboardView.findAll({
-      where: whereDashboard,
-      attributes: ['inscricao_id', 'candidato_nome', 'data_nascimento', 'pcd', 'cargo_nome', 'regiao'],
-      order: [
-        ['regiao', 'ASC'],
-        ['cargo_nome', 'ASC'],
-        ['candidato_nome', 'ASC']
-      ],
-      raw: true
+    const raw = await fetchResultados(cargo, regiao);
+    const gruposMap = {};
+    raw.forEach(item => {
+      const key = `${item.cargo_nome}|${item.regiao}`;
+      if (!gruposMap[key]) {
+        gruposMap[key] = {
+          cargo: item.cargo_nome,
+          regiao: item.regiao,
+          vagas_imediatas: item.vagas_imediatas || 0,
+          reserva_pcd: item.reserva_pcd || 0,
+          lista: []
+        };
+      }
+      gruposMap[key].lista.push(item);
     });
-
-    const hierarquia = {};
-    resultados.forEach(candidato => {
-      const regiaoKey = candidato.regiao;
-      const cargoKey = candidato.cargo_nome;
-
-      if (!hierarquia[regiaoKey]) {
-        hierarquia[regiaoKey] = {
-          regiao: regiaoKey,
-          cargos: {}
-        };
-      }
-
-      if (!hierarquia[regiaoKey].cargos[cargoKey]) {
-        hierarquia[regiaoKey].cargos[cargoKey] = {
-          cargo: cargoKey,
-          candidatos: []
-        };
-      }
-
-      hierarquia[regiaoKey].cargos[cargoKey].candidatos.push({
-        inscricao_id: candidato.inscricao_id,
-        nome: candidato.candidato_nome + (isPCD(candidato.pcd) ? " - PcD" : ""),
-        nascimento: formatDate(candidato.data_nascimento)
+    const grupos = Object.values(gruposMap).map(g => {
+      const sorted = g.lista.sort((a,b) => {
+        if (b.pontuacao !== a.pontuacao) return b.pontuacao - a.pontuacao;
+        return calcularIdade(a.data_nascimento) - calcularIdade(b.data_nascimento);
       });
+      const geraisCount = Math.max(g.vagas_imediatas - g.reserva_pcd, 0);
+      const gerais = sorted.filter(c => !isPCD(c.pcd)).slice(0, geraisCount);
+      const reservadas = g.reserva_pcd > 0
+        ? sorted.filter(c => isPCD(c.pcd) && c.pontuacao >= 50).slice(0, g.reserva_pcd)
+        : [];
+      const others = sorted.filter(c =>
+        !gerais.some(x => x.inscricao_id === c.inscricao_id) &&
+        !reservadas.some(x => x.inscricao_id === c.inscricao_id)
+      );
+      const finalList = [...gerais, ...reservadas, ...others];
+      return {
+        cargo: g.cargo,
+        regiao: g.regiao,
+        vagas_imediatas: g.vagas_imediatas,
+        reserva_pcd: g.reserva_pcd,
+        candidatos: finalList.map((cand, idx) => ({
+          ...cand,
+          idade: calcularIdade(cand.data_nascimento),
+          classificacao: idx + 1,
+          situacao: idx < gerais.length
+            ? 'Classificado'
+            : (idx < gerais.length + reservadas.length
+                ? 'Classificado (Reserva PCD)'
+                : 'Não Classificado')
+        }))
+      };
     });
 
-    const content = [];
-    content.push({ 
-      text: [
-        { text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', style: 'header' },
-        { text: '\nOs candidatos não identificados como PcD concorrem na modalidade de Ampla Concorrência', style: 'observacao' }
-      ],
-      margin: [0, 0, 0, 20],
-      alignment: 'center'
-    });
-
-    Object.keys(hierarquia).sort().forEach(regiaoKey => {
-      const regiaoData = hierarquia[regiaoKey];
-
+    const printer = new PdfPrinter(fonts);
+    const content = [
+      { text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', style: 'header', alignment: 'center', margin: [0,0,0,20] }
+    ];
+    grupos.forEach(gr => {
+      const total = gr.candidatos.length;
+      const ratio = gr.vagas_imediatas ? (total / gr.vagas_imediatas).toFixed(2) : 'N/A';
+      content.push(
+        { text: `REGIÃO: ${gr.regiao.toUpperCase()} • CARGO: ${gr.cargo.toUpperCase()}`, style: 'subheader', margin: [0,10,0,5] },
+        { text: `Vagas: ${gr.vagas_imediatas} | Reserva PcD: ${gr.reserva_pcd} | Inscritos: ${total}`, style: 'info', margin: [0,0,0,2] },
+        { text: `Relação Inscritos/Vagas: ${total}/${gr.vagas_imediatas} (média ${ratio})`, style: 'info', margin: [0,0,0,10] }
+      );
+      const body = [
+        ['Cl.', 'Nome', 'Idade', 'CPF', 'Pontuação', 'Situação'],
+        ...gr.candidatos.map(c => [
+          `${c.classificacao}º`,
+          c.candidato_nome + (c.pcd ? ' (PcD)' : ''),
+          c.idade ?? 'N/A',
+          c.candidato_cpf,
+          `${c.pontuacao}`,
+          c.situacao
+        ])
+      ];
       content.push({
-        text: `REGIÃO: ${regiaoData.regiao.toUpperCase()}`,
-        style: 'regiaoHeader',
-      });
-
-      Object.keys(regiaoData.cargos).sort().forEach(cargoKey => {
-        const cargoData = regiaoData.cargos[cargoKey];
-
-        content.push({
-          text: `Cargo: ${cargoData.cargo} (${cargoData.candidatos.length} candidatos)`,
-          style: 'cargoHeader',
-          margin: [0, 10, 0, 5]
-        });
-
-        const tableBody = [
-          [
-            { text: 'Inscrição', style: 'tableHeader', alignment: 'center' },
-            { text: 'Nome do Candidato', style: 'tableHeader', alignment: 'left' },
-            { text: 'Data de Nascimento', style: 'tableHeader', alignment: 'center' }
-          ]
-        ];
-
-        cargoData.candidatos.forEach(candidato => {
-          tableBody.push([
-            { text: candidato.inscricao_id || 'N/A', alignment: 'center' },
-            { text: candidato.nome, alignment: 'left' },
-            { text: candidato.nascimento, alignment: 'center' }
-          ]);
-        });
-
-        content.push({
-          table: {
-            headerRows: 1,
-            widths: ['20%', '60%', '20%'],
-            body: tableBody,
-            dontBreakRows: true
-          },
-          layout: {
-            hLineWidth: (i) => (i === 0 || i === tableBody.length) ? 1 : 0.5,
-            vLineWidth: () => 0.5,
-            hLineColor: () => '#444',
-            vLineColor: () => '#444',
-            fillColor: (rowIndex) => (rowIndex === 0) ? '#2c3e50' : null
-          },
-          margin: [0, 0, 0, 20]
-        });
+        table: { headerRows: 1, widths: ['auto','*','auto','auto','auto','auto'], body },
+        layout: 'lightHorizontalLines'
       });
     });
 
-    const docDefinition = {
+    const docDef = {
       pageSize: 'A4',
-      pageMargins: [40, 60, 40, 60],
-      header: (currentPage, pageCount) => ({
-        text: `Página ${currentPage} de ${pageCount}`,
-        alignment: 'right',
-        margin: [0, 10, 20, 0],
-        fontSize: 9
-      }),
-      content: content,
+      pageMargins: [40,60,40,60],
+      defaultStyle: { font: 'Roboto' },
+      content,
       styles: {
-        header: {
-          fontSize: 18,
-          bold: true,
-          color: '#2c3e50'
-        },
-        observacao: {
-          fontSize: 10,
-          italics: true,
-          margin: [0, 5, 0, 0]
-        },
-        regiaoHeader: {
-          fontSize: 14,
-          bold: true,
-          color: '#2c3e50',
-          margin: [0, 20, 0, 10]
-        },
-        cargoHeader: {
-          fontSize: 12,
-          bold: true,
-          color: '#34495e'
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 10,
-          color: 'white',
-          fillColor: '#2c3e50'
-        }
-      },
-      defaultStyle: {
-        font: 'Helvetica',
-        fontSize: 10
+        header:    { fontSize: 16, bold: true },
+        subheader: { fontSize: 14, bold: true },
+        info:      { fontSize: 12, italics: true }
       }
     };
 
-    const PdfPrinter = require('pdfmake');
-    const printer = new PdfPrinter({
-      Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
-      }
-    });
-
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
     res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
+    const pdfDoc = printer.createPdfKitDocument(docDef);
     pdfDoc.pipe(res);
     pdfDoc.end();
 
   } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
-    res.status(500).json({ error: error.message });
+    console.error('Erro ao gerar PDF:', error);
+    if (!res.headersSent) res.status(500).json({ error: error.message });
   }
 });
 
