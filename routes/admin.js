@@ -265,7 +265,7 @@ async function fetchResultados(cargo, regiao) {
     WHERE 1=1
       ${whereCargo}
       ${whereRegiao}
-    ORDER BY cr.zona, car.nome, v.pontuacao DESC, c.data_nascimento desc
+    ORDER BY cr.zona, car.nome, v.pontuacao DESC, c.data_nascimento asc
   `;
   return sequelize.query(sql, { type: sequelize.QueryTypes.SELECT });
 }
@@ -292,7 +292,7 @@ router.get('/resultados-pss', async (req, res) => {
     const resultadoFinal = Object.values(grupos).map(g => {
       const sorted = g.lista.sort((a,b) => {
         if (b.pontuacao !== a.pontuacao) return b.pontuacao - a.pontuacao;
-        return calcularIdade(a.data_nascimento) - calcularIdade(b.data_nascimento);
+        return calcularIdade(b.data_nascimento) - calcularIdade(a.data_nascimento);
       });
       const geraisCount = Math.max(g.vagas_imediatas - g.reserva_pcd, 0);
       const gerais = sorted.filter(c => !isPCD(c.pcd)).slice(0, geraisCount);
@@ -350,7 +350,7 @@ router.get('/resultados-pss/pdf', async (req, res) => {
     const grupos = Object.values(gruposMap).map(g => {
       const sorted = g.lista.sort((a,b) => {
         if (b.pontuacao !== a.pontuacao) return b.pontuacao - a.pontuacao;
-        return calcularIdade(a.data_nascimento) - calcularIdade(b.data_nascimento);
+        return calcularIdade(b.data_nascimento) - calcularIdade(a.data_nascimento);
       });
       const geraisCount = Math.max(g.vagas_imediatas - g.reserva_pcd, 0);
       const gerais = sorted.filter(c => !isPCD(c.pcd)).slice(0, geraisCount);
