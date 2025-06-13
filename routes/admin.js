@@ -124,9 +124,16 @@ router.get('/candidato/:cpf', async (req, res) => {
         ...insc.get({ plain: true }),
         pontuacao: val?.pontuacao || 0,
         validacoes: val ? JSON.parse(val.validacoes) : {},
-        justificativa_retificacao: val?.justificativa_retificacao || null
+        justificativa_retificacao: val?.justificativa_retificacao || null,
+        // CAMPOS DA ENTREVISTA
+        entrevista_realizada: val?.entrevista_realizada ?? 0,
+        entrevista_pontuacao: val?.entrevista_pontuacao ?? '',
+        entrevista_obs: val?.entrevista_obs ?? '',
+        entrevista_json: val?.entrevista_json ?? '',
+        entrevista_data: val?.entrevista_data ?? ''
       };
     }));
+    
 
     res.json({
       candidato: {
@@ -218,6 +225,30 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
   } catch (error) {
     console.error('Erro na retificação:', error);
     res.status(500).json({ success: false, message: 'Erro ao processar retificação', error: error.message });
+  }
+});
+
+// 5b) Salvar entrevista (somente para inscrição validada)
+router.post('/salvar-entrevista/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entrevista_json, entrevista_pontuacao, entrevista_obs } = req.body;
+    const valRec = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
+    if (!valRec) return res.status(404).json({ success: false, message: 'Inscrição não encontrada' });
+    if (valRec.status !== 'VALIDADO') {
+      return res.status(400).json({ success: false, message: 'Entrevista só pode ser registrada para inscrições validadas.' });
+    }
+    await valRec.update({
+      entrevista_json: entrevista_json ? (typeof entrevista_json === 'object' ? JSON.stringify(entrevista_json) : entrevista_json) : null,
+      entrevista_pontuacao: entrevista_pontuacao || 0,
+      entrevista_obs: entrevista_obs || null,
+      entrevista_data: new Date(),
+      entrevista_realizada: 1
+    });
+    res.json({ success: true, message: 'Entrevista salva com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao salvar entrevista:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
