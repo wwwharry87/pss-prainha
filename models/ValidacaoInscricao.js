@@ -46,7 +46,13 @@ const ValidacaoInscricao = sequelize.define('ValidacaoInscricao', {
   entrevista_realizada: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
-  }  
+    
+  }, 
+  plano_aula_pontuacao: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+  },
+   
 }, 
 {
   tableName: 'validacoes_inscricoes',

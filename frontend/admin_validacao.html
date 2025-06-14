@@ -131,8 +131,12 @@
           <form id="formEntrevista">
             <input type="hidden" id="entrevistaInscId" />
             <div class="mb-3">
-              <label for="entrevistaPontuacao" class="form-label">Pontuação:</label>
+              <label for="entrevistaPontuacao" class="form-label">Pontuação da Entrevista:</label>
               <input type="number" step="0.1" class="form-control" id="entrevistaPontuacao" min="0" max="100" required />
+            </div>
+            <div class="mb-3">
+              <label for="planoAulaPontuacao" class="form-label">Pontuação do Plano de Aula:</label>
+              <input type="number" step="0.1" class="form-control" id="planoAulaPontuacao" min="0" max="100" required />
             </div>
             <div class="mb-3">
               <label for="entrevistaObs" class="form-label">Observações:</label>
@@ -195,32 +199,6 @@
       }
     }
 
-    function exibirCandidato(candidato) {
-      const candidateSection = document.getElementById('candidateSection');
-      candidateSection.innerHTML = `
-        <div class="card card-validacao">
-          <div class="card-header bg-white">
-            <h4 class="card-title mb-0 fw-bold">
-              <i class="bi bi-person-circle me-2"></i>DADOS DO CANDIDATO
-            </h4>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-6">
-                <p class="mb-2"><strong><i class="bi bi-person me-2"></i>Nome:</strong> ${candidato.nome}</p>
-                <p class="mb-2"><strong><i class="bi bi-credit-card me-2"></i>CPF:</strong> ${formatarCPF(candidato.cpf)}</p>
-              </div>
-              <div class="col-md-6">
-                <p class="mb-2"><strong><i class="bi bi-envelope me-2"></i>E-mail:</strong> ${candidato.email}</p>
-                <p class="mb-2"><strong><i class="bi bi-info-circle me-2"></i>PCD:</strong> ${candidato.pcd ? '<span class="badge bg-info">Sim</span>' : '<span class="badge bg-secondary">Não</span>'}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    // Função montarListaDocumentos — permanece igual ao seu arquivo anterior...
     function exibirCandidato(candidato) {
       const candidateSection = document.getElementById('candidateSection');
       candidateSection.innerHTML = `
@@ -343,7 +321,7 @@
         }
       });
 
-        // Outros documentos (sem repetir Plano de Aula)
+      // Outros documentos (sem repetir Plano de Aula)
       const outrosCampos = [
         'doc_diploma_path', 'doc_especifico_path',
         'doc_especializacao_path', 'doc_mestrado_path', 'doc_doutorado_path'
@@ -371,145 +349,146 @@
         }
       });
 
-
-
       return docs;
     }
 
-    // (código omitido aqui para não ocupar espaço, mas MANTÉM o original que você já tinha!)
-
     function exibirInscricoes(inscricoes) {
-  const container = document.getElementById('inscriptionsSection');
-  container.innerHTML = '';
-  if (inscricoes.length === 0) {
-    container.innerHTML = `
-      <div class="col-12">
-        <div class="alert alert-info d-flex align-items-center">
-          <i class="bi bi-info-circle-fill me-3 fs-4"></i>
-          <div>Nenhuma inscrição encontrada para este candidato.</div>
-        </div>
-      </div>`;
-    return;
-  }
-  inscricoes.forEach((insc, index) => {
-    const isDisabled = insc.status === 'VALIDADO';
-    const entrevistaJaFeita = insc.entrevista_realizada === 1;
-
-    const documentos = montarListaDocumentos(insc, isDisabled);
-    let docsHTML = '<ul class="list-group list-group-flush">';
-    documentos.forEach(doc => {
-      if (isDisabled) {
-        docsHTML += `
-          <li class="list-group-item document-item py-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <strong>${doc.label}</strong>
-                <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
-                ${doc.iconeValidacao}
-              </div>
-              <div class="status-validado">${doc.iconeValidacao ? 'Validado' : 'Não validado'}</div>
+      const container = document.getElementById('inscriptionsSection');
+      container.innerHTML = '';
+      if (inscricoes.length === 0) {
+        container.innerHTML = `
+          <div class="col-12">
+            <div class="alert alert-info d-flex align-items-center">
+              <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+              <div>Nenhuma inscrição encontrada para este candidato.</div>
             </div>
-          </li>`;
-      } else {
-        docsHTML += `
-          <li class="list-group-item document-item py-3">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <strong>${doc.label}</strong>
-                <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
-              </div>
-              <div>
-                <select class="form-select select-validacao" id="validacao_${insc.id}_${doc.campo}">
-                  <option value="">Selecione</option>
-                  <option value="confirmado" ${insc.validacoes && insc.validacoes[doc.campo] === 'confirmado' ? 'selected' : ''}>Confirmado</option>
-                  <option value="rejeitado" ${insc.validacoes && insc.validacoes[doc.campo] === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
-                </select>
-              </div>
-            </div>
-          </li>`;
+          </div>`;
+        return;
       }
-    });
-    docsHTML += '</ul>';
+      inscricoes.forEach((insc, index) => {
+        const isDisabled = insc.status === 'VALIDADO';
+        const entrevistaJaFeita = insc.entrevista_realizada === 1;
 
-    const cargoNome = insc.Cargo ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` : 'Não Informado';
-    const pontuacao = insc.pontuacao || 0;
-    let justificativaHTML = '';
-    if (insc.justificativa_retificacao) {
-      justificativaHTML = `
-        <div class="alert alert-warning mt-3">
-          <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Justificativa da Retificação:</strong>
-          <div class="mt-2">${insc.justificativa_retificacao}</div>
-        </div>`;
+        const documentos = montarListaDocumentos(insc, isDisabled);
+        let docsHTML = '<ul class="list-group list-group-flush">';
+        documentos.forEach(doc => {
+          if (isDisabled) {
+            docsHTML += `
+              <li class="list-group-item document-item py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>${doc.label}</strong>
+                    <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
+                    ${doc.iconeValidacao}
+                  </div>
+                  <div class="status-validado">${doc.iconeValidacao ? 'Validado' : 'Não validado'}</div>
+                </div>
+              </li>`;
+          } else {
+            docsHTML += `
+              <li class="list-group-item document-item py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>${doc.label}</strong>
+                    <i class="bi bi-eye-fill icon-btn" title="Visualizar" onclick="visualizarArquivo('${doc.filename}')"></i>
+                  </div>
+                  <div>
+                    <select class="form-select select-validacao" id="validacao_${insc.id}_${doc.campo}">
+                      <option value="">Selecione</option>
+                      <option value="confirmado" ${insc.validacoes && insc.validacoes[doc.campo] === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                      <option value="rejeitado" ${insc.validacoes && insc.validacoes[doc.campo] === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                    </select>
+                  </div>
+                </div>
+              </li>`;
+          }
+        });
+        docsHTML += '</ul>';
+
+        const cargoNome = insc.Cargo ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` : 'Não Informado';
+        const pontuacao = insc.pontuacao || 0;
+        let justificativaHTML = '';
+        if (insc.justificativa_retificacao) {
+          justificativaHTML = `
+            <div class="alert alert-warning mt-3">
+              <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Justificativa da Retificação:</strong>
+              <div class="mt-2">${insc.justificativa_retificacao}</div>
+            </div>`;
+        }
+
+        // Exibir detalhes da entrevista, se houver
+        let entrevistaHTML = '';
+        if (insc.entrevista_pontuacao !== null && insc.entrevista_pontuacao !== undefined && insc.entrevista_pontuacao !== '') {
+          entrevistaHTML = `
+            <div class="alert alert-info mt-3">
+              <strong><i class="bi bi-mic me-2"></i>Entrevista:</strong><br>
+              <strong>Pontuação da Entrevista:</strong> ${insc.entrevista_pontuacao}<br>
+              <strong>Pontuação do Plano de Aula:</strong> ${insc.plano_aula_pontuacao || '---'}<br>
+              <strong>Observações:</strong> ${insc.entrevista_obs || '---'}<br>
+              <strong>Detalhes:</strong> ${insc.entrevista_json ? (typeof insc.entrevista_json === 'string' ? insc.entrevista_json : JSON.stringify(insc.entrevista_json)) : '---'}<br>
+              <strong>Data:</strong> ${insc.entrevista_data ? new Date(insc.entrevista_data).toLocaleString('pt-BR') : '---'}
+            </div>
+          `;
+        }
+
+        // Botão ou selo de entrevista
+        let entrevistaBtn = '';
+        let entrevistaSelo = '';
+        if (isDisabled && entrevistaJaFeita) {
+          entrevistaSelo = `<span class="badge bg-success mt-2"><i class="bi bi-mic-fill me-1"></i> Entrevista Realizada</span>`;
+        } else if (isDisabled && !entrevistaJaFeita) {
+          entrevistaBtn = `
+            <button class="btn btn-info btn-custom mt-2" onclick="abrirModalEntrevista(
+              ${insc.id},
+              '${insc.entrevista_pontuacao || ''}',
+              '${insc.plano_aula_pontuacao || ''}',
+              '${insc.entrevista_obs || ''}',
+              '${insc.entrevista_json ? (typeof insc.entrevista_json === 'string' ? insc.entrevista_json : JSON.stringify(insc.entrevista_json)) : ''}'
+            )">
+              <i class="bi bi-mic me-2"></i>Registrar Entrevista
+            </button>
+          `;
+        }
+
+        const botoesHTML = isDisabled
+          ? `<button class="btn btn-secondary btn-custom" disabled><i class="bi bi-check-circle-fill me-2"></i>Validação Confirmada</button>
+             <button class="btn btn-warning btn-custom retificacao-btn" onclick="abrirModalRetificacao(${insc.id})"><i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação</button>
+             ${entrevistaBtn}
+             ${entrevistaSelo}`
+          : `<button class="btn btn-success btn-custom" onclick="submitValidacao(${insc.id})"><i class="bi bi-check-circle-fill me-2"></i>Confirmar Validação</button>`;
+
+        const card = document.createElement('div');
+        card.className = 'col-12';
+        card.innerHTML = `
+          <div class="card card-validacao">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0 fw-bold">
+                <i class="bi bi-file-earmark-text me-2"></i>INSCRIÇÃO ${index + 1}
+                <span class="badge bg-${isDisabled ? 'success' : 'warning'} ms-2">${insc.status || 'PENDENTE'}</span>
+              </h5>
+              <span class="score-badge"><i class="bi bi-star-fill me-1"></i>${pontuacao} pts</span>
+            </div>
+            <div class="card-body">
+              ${justificativaHTML}
+              ${entrevistaHTML}
+              <div class="row mb-3">
+                <div class="col-md-6"><p><strong><i class="bi bi-briefcase me-2"></i>Cargo:</strong> ${cargoNome}</p></div>
+                <div class="col-md-6"><p><strong><i class="bi bi-geo-alt me-2"></i>Zona:</strong> ${insc.zona}</p></div>
+              </div>
+              <h6 class="fw-bold mt-4 mb-3"><i class="bi bi-files me-2"></i>DOCUMENTOS</h6>
+              ${docsHTML}
+              <div class="mt-4">
+                <label for="obs_${insc.id}" class="form-label fw-bold"><i class="bi bi-chat-left-text me-2"></i>Observações:</label>
+                <textarea class="form-control" id="obs_${insc.id}" rows="3" ${isDisabled ? 'disabled' : ''}>${insc.observacoes || ''}</textarea>
+              </div>
+              <div class="d-grid mt-4 gap-2">
+                ${botoesHTML}
+              </div>
+            </div>
+          </div>`;
+        container.appendChild(card);
+      });
     }
-
-    // Exibir detalhes da entrevista, se houver
-    let entrevistaHTML = '';
-    if (insc.entrevista_pontuacao !== null && insc.entrevista_pontuacao !== undefined && insc.entrevista_pontuacao !== '') {
-      entrevistaHTML = `
-        <div class="alert alert-info mt-3">
-          <strong><i class="bi bi-mic me-2"></i>Entrevista:</strong><br>
-          <strong>Pontuação:</strong> ${insc.entrevista_pontuacao}<br>
-          <strong>Observações:</strong> ${insc.entrevista_obs || '---'}<br>
-          <strong>Detalhes:</strong> ${insc.entrevista_json ? (typeof insc.entrevista_json === 'string' ? insc.entrevista_json : JSON.stringify(insc.entrevista_json)) : '---'}<br>
-          <strong>Data:</strong> ${insc.entrevista_data ? new Date(insc.entrevista_data).toLocaleString('pt-BR') : '---'}
-        </div>
-      `;
-    }
-
-    // Botão ou selo de entrevista
-    let entrevistaBtn = '';
-    let entrevistaSelo = '';
-    if (isDisabled && entrevistaJaFeita) {
-      entrevistaSelo = `<span class="badge bg-success mt-2"><i class="bi bi-mic-fill me-1"></i> Entrevista Realizada</span>`;
-    } else if (isDisabled && !entrevistaJaFeita) {
-      entrevistaBtn = `
-        <button class="btn btn-info btn-custom mt-2" onclick="abrirModalEntrevista(${insc.id}, '', '', '')">
-          <i class="bi bi-mic me-2"></i>Registrar Entrevista
-        </button>
-      `;
-    }
-
-    const botoesHTML = isDisabled
-      ? `<button class="btn btn-secondary btn-custom" disabled><i class="bi bi-check-circle-fill me-2"></i>Validação Confirmada</button>
-         <button class="btn btn-warning btn-custom retificacao-btn" onclick="abrirModalRetificacao(${insc.id})"><i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação</button>
-         ${entrevistaBtn}
-         ${entrevistaSelo}`
-      : `<button class="btn btn-success btn-custom" onclick="submitValidacao(${insc.id})"><i class="bi bi-check-circle-fill me-2"></i>Confirmar Validação</button>`;
-
-    const card = document.createElement('div');
-    card.className = 'col-12';
-    card.innerHTML = `
-      <div class="card card-validacao">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h5 class="card-title mb-0 fw-bold">
-            <i class="bi bi-file-earmark-text me-2"></i>INSCRIÇÃO ${index + 1}
-            <span class="badge bg-${isDisabled ? 'success' : 'warning'} ms-2">${insc.status || 'PENDENTE'}</span>
-          </h5>
-          <span class="score-badge"><i class="bi bi-star-fill me-1"></i>${pontuacao} pts</span>
-        </div>
-        <div class="card-body">
-          ${justificativaHTML}
-          ${entrevistaHTML}
-          <div class="row mb-3">
-            <div class="col-md-6"><p><strong><i class="bi bi-briefcase me-2"></i>Cargo:</strong> ${cargoNome}</p></div>
-            <div class="col-md-6"><p><strong><i class="bi bi-geo-alt me-2"></i>Zona:</strong> ${insc.zona}</p></div>
-          </div>
-          <h6 class="fw-bold mt-4 mb-3"><i class="bi bi-files me-2"></i>DOCUMENTOS</h6>
-          ${docsHTML}
-          <div class="mt-4">
-            <label for="obs_${insc.id}" class="form-label fw-bold"><i class="bi bi-chat-left-text me-2"></i>Observações:</label>
-            <textarea class="form-control" id="obs_${insc.id}" rows="3" ${isDisabled ? 'disabled' : ''}>${insc.observacoes || ''}</textarea>
-          </div>
-          <div class="d-grid mt-4 gap-2">
-            ${botoesHTML}
-          </div>
-        </div>
-      </div>`;
-    container.appendChild(card);
-  });
-}
-
-
 
     async function submitValidacao(inscricaoId) {
       const selects = document.querySelectorAll(`[id^="validacao_${inscricaoId}_"]`);
@@ -606,10 +585,10 @@
       toast.addEventListener('hidden.bs.toast', () => toastContainer.remove());
     }
 
-    // NOVO: Modal Entrevista
-    function abrirModalEntrevista(id, pontuacao = '', obs = '', detalhes = '') {
+    function abrirModalEntrevista(id, pontuacao = '', planoAulaPontuacao = '', obs = '', detalhes = '') {
       $('#entrevistaInscId').val(id);
       $('#entrevistaPontuacao').val(pontuacao);
+      $('#planoAulaPontuacao').val(planoAulaPontuacao);
       $('#entrevistaObs').val(obs);
       $('#entrevistaJson').val(detalhes);
       new bootstrap.Modal(document.getElementById('entrevistaModal')).show();
@@ -618,6 +597,7 @@
     async function salvarEntrevista() {
       const id = $('#entrevistaInscId').val();
       const pontuacao = $('#entrevistaPontuacao').val();
+      const plano_aula_pontuacao = $('#planoAulaPontuacao').val();
       const obs = $('#entrevistaObs').val();
       let detalhes = $('#entrevistaJson').val();
 
@@ -637,6 +617,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             entrevista_pontuacao: pontuacao,
+            plano_aula_pontuacao: plano_aula_pontuacao,
             entrevista_obs: obs,
             entrevista_json: entrevista_json
           })

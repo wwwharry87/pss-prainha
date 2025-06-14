@@ -123,6 +123,7 @@ router.get('/candidato/:cpf', async (req, res) => {
       return {
         ...insc.get({ plain: true }),
         pontuacao: val?.pontuacao || 0,
+        plano_aula_pontuacao: val?.plano_aula_pontuacao || 0, // NOVO CAMPO ENTREVISTA
         validacoes: val ? JSON.parse(val.validacoes) : {},
         justificativa_retificacao: val?.justificativa_retificacao || null,
         // CAMPOS DA ENTREVISTA
@@ -232,7 +233,7 @@ router.post('/retificar-inscricao/:id', async (req, res) => {
 router.post('/salvar-entrevista/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { entrevista_json, entrevista_pontuacao, entrevista_obs } = req.body;
+    const { entrevista_json, entrevista_pontuacao, entrevista_obs, plano_aula_pontuacao } = req.body; // NOVO CAMPO AQUI
     const valRec = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
     if (!valRec) return res.status(404).json({ success: false, message: 'Inscrição não encontrada' });
     if (valRec.status !== 'VALIDADO') {
@@ -241,6 +242,7 @@ router.post('/salvar-entrevista/:id', async (req, res) => {
     await valRec.update({
       entrevista_json: entrevista_json ? (typeof entrevista_json === 'object' ? JSON.stringify(entrevista_json) : entrevista_json) : null,
       entrevista_pontuacao: entrevista_pontuacao || 0,
+      plano_aula_pontuacao: plano_aula_pontuacao || 0, // <-- SALVANDO NOVO CAMPO
       entrevista_obs: entrevista_obs || null,
       entrevista_data: new Date(),
       entrevista_realizada: 1
