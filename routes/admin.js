@@ -10,6 +10,7 @@ const CargoRegiao = require('../models/CargoRegiao');
 const path = require('path');
 const PdfPrinter = require('pdfmake/src/printer');
 const router = express.Router();
+const fs = require('fs');
 
 // Mapear fontes para pdfmake
 const fonts = {
@@ -18,6 +19,12 @@ const fonts = {
     bold: path.join(__dirname,  '../fonts/Roboto/Roboto-Bold.ttf'),
     italics: path.join(__dirname,  '../fonts/Roboto/Roboto-Italic.ttf'),
     bolditalics: path.join(__dirname,  '../fonts/Roboto/Roboto-BoldItalic.ttf')
+  },
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique'
   }
 };
 
@@ -361,108 +368,442 @@ router.get('/resultados-pss', async (req, res) => {
   }
 });
 
-// 8) Geração de PDF
-router.get('/resultados-pss/pdf', async (req, res) => {
+// Carregamento do logo (opcional)
+let logoBase64 = null;
+const logoPath = path.resolve(__dirname, '..', 'logo.jpeg');
+try { logoBase64 = fs.readFileSync(logoPath).toString('base64'); } catch {}
+
+
+router.get('/resultados-pss/pdf-detalhado', async (req, res) => {
   try {
-    const { cargo, regiao } = req.query;
-    const raw = await fetchResultados(cargo, regiao);
-    const gruposMap = {};
-    raw.forEach(item => {
-      const key = `${item.cargo_nome}|${item.regiao}`;
-      if (!gruposMap[key]) {
-        gruposMap[key] = {
-          cargo: item.cargo_nome,
-          regiao: item.regiao,
-          vagas_imediatas: item.vagas_imediatas || 0,
-          reserva_pcd: item.reserva_pcd || 0,
-          lista: []
-        };
-      }
-      gruposMap[key].lista.push(item);
-    });
-    const grupos = Object.values(gruposMap).map(g => {
-      const sorted = g.lista.sort((a,b) => {
-        if (b.pontuacao !== a.pontuacao) return b.pontuacao - a.pontuacao;
-        return calcularIdade(b.data_nascimento) - calcularIdade(a.data_nascimento);
-      });
-      const geraisCount = Math.max(g.vagas_imediatas - g.reserva_pcd, 0);
-      const gerais = sorted.filter(c => !isPCD(c.pcd)).slice(0, geraisCount);
-      const reservadas = g.reserva_pcd > 0
-        ? sorted.filter(c => isPCD(c.pcd) && c.pontuacao >= 50).slice(0, g.reserva_pcd)
-        : [];
-      const others = sorted.filter(c =>
-        !gerais.some(x => x.inscricao_id === c.inscricao_id) &&
-        !reservadas.some(x => x.inscricao_id === c.inscricao_id)
-      );
-      const finalList = [...gerais, ...reservadas, ...others];
-      return {
-        cargo: g.cargo,
-        regiao: g.regiao,
-        vagas_imediatas: g.vagas_imediatas,
-        reserva_pcd: g.reserva_pcd,
-        candidatos: finalList.map((cand, idx) => ({
-          ...cand,
-          idade: calcularIdade(cand.data_nascimento),
-          classificacao: idx + 1,
-          situacao: idx < gerais.length
-            ? 'Classificado'
-            : (idx < gerais.length + reservadas.length
-                ? 'Classificado (Reserva PCD)'
-                : 'Não Classificado')
-        }))
-      };
+    const { cargo = '', regiao = '' } = req.query;
+    const sql = `
+WITH ultimas_validacoes AS (
+  SELECT DISTINCT ON (inscricao_id) *
+  FROM validacoes_inscricoes_backup
+  WHERE status = 'VALIDADO'
+  ORDER BY inscricao_id, "updatedAt" DESC
+),
+base AS (
+  SELECT
+    v.inscricao_id,
+    cad.nome AS nome,
+    cad.pcd,
+    trim(both '"' from translate(v.validacoes::text, E'\\\\', ''))::jsonb AS valj,
+    CASE WHEN cad.pcd THEN 'PcD' ELSE 'Ampla Concorrência' END AS modalidade,
+    cad.data_nascimento,
+    to_char(cad.data_nascimento, 'DD/MM/YYYY') AS dn,
+    i.tempo_exercicio,
+    c.nome AS cargo,
+    cr.zona AS regiao,
+    cr.vagas_imediatas AS vagas,
+    cr.reserva_pcd,
+    c.nivel,
+    v.entrevista_pontuacao,
+    v.plano_aula_pontuacao
+  FROM ultimas_validacoes v
+  JOIN inscricoes i ON i.id = v.inscricao_id
+  JOIN candidatos cad ON cad.id = i.candidato_id
+  JOIN cargos c ON c.id = i.cargo_id
+  JOIN cargo_regioes cr ON cr.cargo_id = c.id AND cr.zona = i.zona
+  WHERE c.nome ILIKE :cargoFilter
+    AND cr.zona ILIKE :regiaoFilter
+),
+calculo AS (
+  SELECT
+    b.*,
+    (CASE WHEN b.valj->>'doc_escolaridade_path'='confirmado' THEN 50 ELSE 0 END) AS "I - RCM",
+    (CASE
+      WHEN b.valj->>'doc_certificado_fundamental_path'='confirmado'
+        OR b.valj->>'doc_certificado_fund_completo_path'='confirmado'
+      THEN 10 ELSE 0 END) AS "II - CCF",
+    (CASE WHEN b.valj->>'doc_certificado_medio_path'='confirmado' THEN 10 ELSE 0 END) AS "III - CCM",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS d(k,v)
+        WHERE d.k LIKE 'doc_cursos_%' AND d.v='confirmado')
+      ,4) * 5) AS "IV - CC",
+    (CASE WHEN b.valj->>'doc_tempo_exercicio_path'='confirmado'
+      THEN CASE b.tempo_exercicio
+        WHEN 'ate02' THEN 5
+        WHEN 'de02a04' THEN 10
+        WHEN 'de04a06' THEN 15
+        WHEN 'mais06' THEN 20
+        ELSE 0
+      END
+      ELSE 0 END) AS "V - TEAP",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS p(k,v)
+        WHERE p.k LIKE 'doc_pos_%' AND p.v='confirmado')
+      ,2) * 5) AS "VI - PG/E",
+    (CASE WHEN b.valj->>'doc_mestrado_path'='confirmado' THEN 5 ELSE 0 END) AS "VII - MES",
+    (CASE WHEN b.valj->>'doc_doutorado_path'='confirmado' THEN 5 ELSE 0 END) AS "VIII - DOU",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS q(k,v)
+        WHERE q.k LIKE 'doc_qualificacao_%' AND q.v='confirmado')
+      ,2) * 5) AS "IX - CQA",
+    (
+      (CASE WHEN b.valj->>'doc_escolaridade_path'='confirmado' THEN 50 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_certificado_fundamental_path'='confirmado' OR b.valj->>'doc_certificado_fund_completo_path'='confirmado' THEN 10 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_certificado_medio_path'='confirmado' THEN 10 ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS d(k,v) WHERE d.k LIKE 'doc_cursos_%' AND d.v='confirmado'),4)*5
+      + (CASE WHEN b.valj->>'doc_tempo_exercicio_path'='confirmado'
+          THEN CASE b.tempo_exercicio WHEN 'ate02' THEN 5 WHEN 'de02a04' THEN 10 WHEN 'de04a06' THEN 15 WHEN 'mais06' THEN 20 ELSE 0 END
+          ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS p(k,v) WHERE p.k LIKE 'doc_pos_%' AND p.v='confirmado'),2)*5
+      + (CASE WHEN b.valj->>'doc_mestrado_path'='confirmado' THEN 5 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_doutorado_path'='confirmado' THEN 5 ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS q(k,v) WHERE q.k LIKE 'doc_qualificacao_%' AND q.v='confirmado'),2)*5
+      + COALESCE(b.entrevista_pontuacao, 0)
+      + COALESCE(b.plano_aula_pontuacao, 0)
+    ) AS pontos,
+    date_part('year', age(current_date,b.data_nascimento)) AS idade,
+    -- Definição da situação:
+    CASE
+      WHEN (b.valj ? 'doc_plano_aula_path') THEN 
+        CASE WHEN COALESCE(b.plano_aula_pontuacao, 0) < 5 THEN 'Eliminado' ELSE 'Classificado' END
+      WHEN (NOT (b.valj ? 'doc_plano_aula_path')) THEN 
+        CASE WHEN COALESCE(b.entrevista_pontuacao, 0) < 6 THEN 'Eliminado' ELSE 'Classificado' END
+      ELSE 'Classificado'
+    END AS situacao
+  FROM base b
+),
+classificacao_normal AS (
+  SELECT
+    *, ROW_NUMBER() OVER (PARTITION BY cargo,regiao ORDER BY
+      situacao ASC, -- Classificado primeiro, depois Eliminado
+      pontos DESC,
+      idade DESC
+    ) AS posicao_geral
+  FROM calculo
+),
+best_non_pcd AS (
+  SELECT DISTINCT ON (cargo,regiao) cargo, regiao, inscricao_id AS best_non_pcd
+  FROM classificacao_normal WHERE NOT pcd AND situacao='Classificado' ORDER BY cargo,regiao,pontos DESC,idade DESC
+),
+best_pcd AS (
+  SELECT DISTINCT ON (cargo,regiao) cargo, regiao, inscricao_id AS best_pcd
+  FROM classificacao_normal WHERE pcd AND reserva_pcd AND pontos>=50 AND situacao='Classificado' ORDER BY cargo,regiao,pontos DESC,idade DESC
+),
+classificacao_final AS (
+  SELECT
+    cn.*,
+    ROW_NUMBER() OVER (
+      PARTITION BY cn.cargo,cn.regiao
+      ORDER BY
+        CASE WHEN cn.inscricao_id=bc.best_non_pcd THEN 1 WHEN cn.inscricao_id=bp.best_pcd THEN 2 ELSE 3 END,
+        cn.situacao ASC,
+        cn.pontos DESC,
+        cn.idade DESC
+    ) AS classificacao
+  FROM classificacao_normal cn
+  LEFT JOIN best_non_pcd bc ON cn.cargo=bc.cargo AND cn.regiao=bc.regiao
+  LEFT JOIN best_pcd bp ON cn.cargo=bp.cargo AND cn.regiao=bp.regiao
+)
+SELECT
+  cf.cargo||' - '||cf.regiao||' | VAGAS: '||cf.vagas||(CASE WHEN cf.reserva_pcd THEN ' (reserva PcD)' ELSE '' END) AS cabecalho,
+  cf.inscricao_id AS inscricao_id,
+  cf.nome, cf.modalidade, cf.dn,
+  cf."I - RCM",cf."II - CCF",cf."III - CCM",cf."IV - CC",cf."V - TEAP",cf."VI - PG/E",cf."VII - MES",cf."VIII - DOU",cf."IX - CQA",
+  cf.entrevista_pontuacao,
+  cf.plano_aula_pontuacao,
+  cf.pontos,
+  cf.situacao,
+  cf.classificacao
+FROM classificacao_final cf
+ORDER BY cf.cargo,cf.regiao,cf.situacao,cf.classificacao;
+    `;
+    const rows = await sequelize.query(sql, {
+      type: sequelize.QueryTypes.SELECT,
+      replacements: { cargoFilter: `%${cargo}%`, regiaoFilter: `%${regiao}%` }
     });
 
-    const printer = new PdfPrinter(fonts);
-    const content = [
-      { text: 'RESULTADO DAS INSCRIÇÕES - PSS 001/2025', style: 'header', alignment: 'center', margin: [0,0,0,20] }
+    // Montar colunas para o PDF
+    const columns = [
+      { title: 'Inscrição', key: 'inscricao_id', width: 30 },
+      { title: 'Nome', key: 'nome', width: '*' },
+      { title: 'Modalidade', key: 'modalidade', width: 50 },
+      { title: 'D.N.', key: 'dn', width: 40 },
+      { title: 'I - RCM', key: 'I - RCM', width: 25 },
+      { title: 'II - CCF', key: 'II - CCF', width: 25 },
+      { title: 'III - CCM', key: 'III - CCM', width: 25 },
+      { title: 'IV - CC', key: 'IV - CC', width: 25 },
+      { title: 'V - TEAP', key: 'V - TEAP', width: 30 },
+      { title: 'VI - PG/E', key: 'VI - PG/E', width: 30 },
+      { title: 'VII - MES', key: 'VII - MES', width: 25 },
+      { title: 'VIII - DOU', key: 'VIII - DOU', width: 25 },
+      { title: 'IX - CQA', key: 'IX - CQA', width: 25 },
+      { title: 'Entrevista', key: 'entrevista_pontuacao', width: 25 },
+      { title: 'Plano Aula', key: 'plano_aula_pontuacao', width: 25 },
+      { title: 'Pontos', key: 'pontos', width: 25 },
+      { title: 'Situação', key: 'situacao', width: 40 },
+      { title: 'Classif.', key: 'classificacao', width: 30 }
     ];
-    grupos.forEach(gr => {
-      const total = gr.candidatos.length;
-      const ratio = gr.vagas_imediatas ? (total / gr.vagas_imediatas).toFixed(2) : 'N/A';
-      content.push(
-        { text: `REGIÃO: ${gr.regiao.toUpperCase()} • CARGO: ${gr.cargo.toUpperCase()}`, style: 'subheader', margin: [0,10,0,5] },
-        { text: `Vagas: ${gr.vagas_imediatas} | Reserva PcD: ${gr.reserva_pcd} | Inscritos: ${total}`, style: 'info', margin: [0,0,0,2] },
-        { text: `Relação Inscritos/Vagas: ${total}/${gr.vagas_imediatas} (média ${ratio})`, style: 'info', margin: [0,0,0,10] }
-      );
-      const body = [
-        ['Cl.', 'Nome', 'Idade', 'CPF', 'Pontuação', 'Situação'],
-        ...gr.candidatos.map(c => [
-          `${c.classificacao}º`,
-          c.candidato_nome + (c.pcd ? ' (PcD)' : ''),
-          c.idade ?? 'N/A',
-          c.candidato_cpf,
-          `${c.pontuacao}`,
-          c.situacao
-        ])
-      ];
+
+    // Agrupa candidatos por cargo+regiao para o relatório
+    const groups = rows.reduce((acc, row) => {
+      acc[row.cabecalho] = acc[row.cabecalho] || [];
+      acc[row.cabecalho].push(row);
+      return acc;
+    }, {});
+
+    const printedAt = new Date().toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    // Gera o conteúdo do PDF
+    const content = [];
+    if (logoBase64) content.push({
+      image: `data:image/jpeg;base64,${logoBase64}`,
+      width: 80,
+      alignment: 'center',
+      margin: [0, 0, 0, 5]
+    });
+    content.push({
+      text: 'RELATÓRIO DETALHADO - PSS',
+      style: 'header',
+      alignment: 'center',
+      margin: [0, 0, 0, 8]
+    });
+
+    const hdrStyle = { fillColor: '#2c3e50', color: '#fff', bold: true, fontSize: 6, alignment: 'center' };
+    const cellStyle = { fontSize: 5, alignment: 'center' };
+    const cellPcd = { fontSize: 5, alignment: 'center', fillColor: '#e3f2fd' };
+    const cellEliminado = { fontSize: 5, alignment: 'center', fillColor: '#ffcccc' };
+
+    Object.entries(groups).forEach(([cab, grp], idx) => {
+      if (idx > 0) content.push({ text: '', pageBreak: 'before' });
       content.push({
-        table: { headerRows: 1, widths: ['auto','*','auto','auto','auto','auto'], body },
-        layout: 'lightHorizontalLines'
+        text: `${cab} | Total inscritos: ${grp.length}`,
+        style: 'subheader',
+        alignment: 'center',
+        margin: [0, 0, 0, 5]
       });
+
+      // Monta tabela (classificados acima, eliminados abaixo)
+      const classificados = grp.filter(r => r.situacao === 'Classificado');
+      const eliminados = grp.filter(r => r.situacao === 'Eliminado');
+
+      const body = [];
+      body.push(columns.map(col => ({ text: col.title, style: hdrStyle })));
+
+      classificados.forEach(r => {
+        body.push(columns.map(col => {
+          let style = cellStyle;
+          if (r.modalidade === 'PcD') style = cellPcd;
+          return { text: r[col.key] !== undefined ? r[col.key] : '', style };
+        }));
+      });
+
+      if (eliminados.length > 0) {
+        // Linha separadora no PDF
+        body.push(columns.map(col =>
+          ({ text: col.title === 'Nome' ? '--- ELIMINADOS ---' : '', style: { fontSize: 6, alignment: 'center', bold: true, color: '#900' } })
+        ));
+        eliminados.forEach(r => {
+          body.push(columns.map(col => {
+            // Cor diferenciada para eliminados
+            return { text: r[col.key] !== undefined ? r[col.key] : '', style: cellEliminado };
+          }));
+        });
+      }
+
+      content.push({
+        table: { headerRows: 1, widths: columns.map(c => c.width), body },
+        layout: {
+          hLineWidth: (i) => i === 0 ? 0.4 : 0.2,
+          vLineWidth: () => 0.2,
+          hLineColor: (i) => i === 0 ? '#2c3e50' : '#ccc',
+          vLineColor: () => '#ccc',
+          padding: [1, 1, 1, 1]
+        },
+        margin: [0, 0, 0, 8]
+      });
+    });
+
+    content.push({
+      text: 'Legenda: RCM=Requisitos Mínimos para Cargo, CCF=Cert. Conclusão Fundamental, CCM=Cert. Conclusão Ensino Médio, CC=Cursos Complementares, TEAP=Tempo de Exercício, PG/E=Pós Graduação/Especialização, MES=Mestrado, DOU=Doutorado, CQA=Qualificação/Aperfeiçoamento',
+      fontSize: 5,
+      margin: [0, 2, 0, 0]
     });
 
     const docDef = {
-      pageSize: 'A4',
-      pageMargins: [40,60,40,60],
-      defaultStyle: { font: 'Roboto' },
       content,
+      pageSize: 'A4',
+      pageOrientation: 'landscape',
+      pageMargins: [10, 15, 10, 15],
+      defaultStyle: { font: 'Helvetica' },
       styles: {
-        header:    { fontSize: 16, bold: true },
-        subheader: { fontSize: 14, bold: true },
-        info:      { fontSize: 12, italics: true }
-      }
+        header: { fontSize: 10, bold: true },
+        subheader: { fontSize: 8, bold: true }
+      },
+      footer: (cp, pc) => ({
+        columns: [
+          { text: `Gerado em: ${printedAt}`, fontSize: 5 },
+          { text: `Página ${cp} de ${pc}`, alignment: 'right', fontSize: 5 }
+        ],
+        margin: [10, 0, 10, 0]
+      })
     };
 
-    res.setHeader('Content-Disposition', 'attachment; filename="resultados_pss.pdf"');
+    const printer = new PdfPrinter(fonts);
+
+    res.setHeader('Content-Disposition', 'attachment; filename="relatorio_pss_detalhado.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
     const pdfDoc = printer.createPdfKitDocument(docDef);
     pdfDoc.pipe(res);
     pdfDoc.end();
+  } catch (err) {
+    console.error('Erro ao gerar PDF detalhado:', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
 
-  } catch (error) {
-    console.error('Erro ao gerar PDF:', error);
-    if (!res.headersSent) res.status(500).json({ error: error.message });
+// Endpoint para retornar resultados detalhados em JSON (igual ao PDF)
+router.get('/resultados-pss/detalhado', async (req, res) => {
+  try {
+    const { cargo = '', regiao = '' } = req.query;
+    const sql = `
+WITH ultimas_validacoes AS (
+  SELECT DISTINCT ON (inscricao_id) *
+  FROM validacoes_inscricoes_backup
+  WHERE status = 'VALIDADO'
+  ORDER BY inscricao_id, "updatedAt" DESC
+),
+base AS (
+  SELECT
+    v.inscricao_id,
+    cad.nome AS nome,
+    cad.pcd,
+    trim(both '"' from translate(v.validacoes::text, E'\\\\', ''))::jsonb AS valj,
+    CASE WHEN cad.pcd THEN 'PcD' ELSE 'Ampla Concorrência' END AS modalidade,
+    cad.data_nascimento,
+    to_char(cad.data_nascimento, 'DD/MM/YYYY') AS dn,
+    i.tempo_exercicio,
+    c.nome AS cargo,
+    cr.zona AS regiao,
+    cr.vagas_imediatas AS vagas,
+    cr.reserva_pcd,
+    c.nivel,
+    v.entrevista_pontuacao,
+    v.plano_aula_pontuacao
+  FROM ultimas_validacoes v
+  JOIN inscricoes i ON i.id = v.inscricao_id
+  JOIN candidatos cad ON cad.id = i.candidato_id
+  JOIN cargos c ON c.id = i.cargo_id
+  JOIN cargo_regioes cr ON cr.cargo_id = c.id AND cr.zona = i.zona
+  WHERE c.nome ILIKE :cargoFilter
+    AND cr.zona ILIKE :regiaoFilter
+),
+calculo AS (
+  SELECT
+    b.*,
+    (CASE WHEN b.valj->>'doc_escolaridade_path'='confirmado' THEN 50 ELSE 0 END) AS "I - RCM",
+    (CASE
+      WHEN b.valj->>'doc_certificado_fundamental_path'='confirmado'
+        OR b.valj->>'doc_certificado_fund_completo_path'='confirmado'
+      THEN 10 ELSE 0 END) AS "II - CCF",
+    (CASE WHEN b.valj->>'doc_certificado_medio_path'='confirmado' THEN 10 ELSE 0 END) AS "III - CCM",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS d(k,v)
+        WHERE d.k LIKE 'doc_cursos_%' AND d.v='confirmado')
+      ,4) * 5) AS "IV - CC",
+    (CASE WHEN b.valj->>'doc_tempo_exercicio_path'='confirmado'
+      THEN CASE b.tempo_exercicio
+        WHEN 'ate02' THEN 5
+        WHEN 'de02a04' THEN 10
+        WHEN 'de04a06' THEN 15
+        WHEN 'mais06' THEN 20
+        ELSE 0
+      END
+      ELSE 0 END) AS "V - TEAP",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS p(k,v)
+        WHERE p.k LIKE 'doc_pos_%' AND p.v='confirmado')
+      ,2) * 5) AS "VI - PG/E",
+    (CASE WHEN b.valj->>'doc_mestrado_path'='confirmado' THEN 5 ELSE 0 END) AS "VII - MES",
+    (CASE WHEN b.valj->>'doc_doutorado_path'='confirmado' THEN 5 ELSE 0 END) AS "VIII - DOU",
+    (LEAST(
+      (SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS q(k,v)
+        WHERE q.k LIKE 'doc_qualificacao_%' AND q.v='confirmado')
+      ,2) * 5) AS "IX - CQA",
+    (
+      (CASE WHEN b.valj->>'doc_escolaridade_path'='confirmado' THEN 50 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_certificado_fundamental_path'='confirmado' OR b.valj->>'doc_certificado_fund_completo_path'='confirmado' THEN 10 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_certificado_medio_path'='confirmado' THEN 10 ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS d(k,v) WHERE d.k LIKE 'doc_cursos_%' AND d.v='confirmado'),4)*5
+      + (CASE WHEN b.valj->>'doc_tempo_exercicio_path'='confirmado'
+          THEN CASE b.tempo_exercicio WHEN 'ate02' THEN 5 WHEN 'de02a04' THEN 10 WHEN 'de04a06' THEN 15 WHEN 'mais06' THEN 20 ELSE 0 END
+          ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS p(k,v) WHERE p.k LIKE 'doc_pos_%' AND p.v='confirmado'),2)*5
+      + (CASE WHEN b.valj->>'doc_mestrado_path'='confirmado' THEN 5 ELSE 0 END)
+      + (CASE WHEN b.valj->>'doc_doutorado_path'='confirmado' THEN 5 ELSE 0 END)
+      + LEAST((SELECT COUNT(*) FROM jsonb_each_text(b.valj) AS q(k,v) WHERE q.k LIKE 'doc_qualificacao_%' AND q.v='confirmado'),2)*5
+      + COALESCE(b.entrevista_pontuacao, 0)
+      + COALESCE(b.plano_aula_pontuacao, 0)
+    ) AS pontos,
+    date_part('year', age(current_date,b.data_nascimento)) AS idade,
+    -- Definição da situação:
+    CASE
+      WHEN (b.valj ? 'doc_plano_aula_path') THEN 
+        CASE WHEN COALESCE(b.plano_aula_pontuacao, 0) < 5 THEN 'Eliminado' ELSE 'Classificado' END
+      WHEN (NOT (b.valj ? 'doc_plano_aula_path')) THEN 
+        CASE WHEN COALESCE(b.entrevista_pontuacao, 0) < 6 THEN 'Eliminado' ELSE 'Classificado' END
+      ELSE 'Classificado'
+    END AS situacao
+  FROM base b
+),
+classificacao_normal AS (
+  SELECT
+    *, ROW_NUMBER() OVER (PARTITION BY cargo,regiao ORDER BY
+      situacao ASC, -- Classificado primeiro, depois Eliminado
+      pontos DESC,
+      idade DESC
+    ) AS posicao_geral
+  FROM calculo
+),
+best_non_pcd AS (
+  SELECT DISTINCT ON (cargo,regiao) cargo, regiao, inscricao_id AS best_non_pcd
+  FROM classificacao_normal WHERE NOT pcd AND situacao='Classificado' ORDER BY cargo,regiao,pontos DESC,idade DESC
+),
+best_pcd AS (
+  SELECT DISTINCT ON (cargo,regiao) cargo, regiao, inscricao_id AS best_pcd
+  FROM classificacao_normal WHERE pcd AND reserva_pcd AND pontos>=50 AND situacao='Classificado' ORDER BY cargo,regiao,pontos DESC,idade DESC
+),
+classificacao_final AS (
+  SELECT
+    cn.*,
+    ROW_NUMBER() OVER (
+      PARTITION BY cn.cargo,cn.regiao
+      ORDER BY
+        CASE WHEN cn.inscricao_id=bc.best_non_pcd THEN 1 WHEN cn.inscricao_id=bp.best_pcd THEN 2 ELSE 3 END,
+        cn.situacao ASC,
+        cn.pontos DESC,
+        cn.idade DESC
+    ) AS classificacao
+  FROM classificacao_normal cn
+  LEFT JOIN best_non_pcd bc ON cn.cargo=bc.cargo AND cn.regiao=bc.regiao
+  LEFT JOIN best_pcd bp ON cn.cargo=bp.cargo AND cn.regiao=bp.regiao
+)
+SELECT
+  cf.cargo||' - '||cf.regiao||' | VAGAS: '||cf.vagas||(CASE WHEN cf.reserva_pcd THEN ' (reserva PcD)' ELSE '' END) AS cabecalho,
+  cf.inscricao_id AS inscricao_id,
+  cf.nome, cf.modalidade, cf.dn,
+  cf."I - RCM",cf."II - CCF",cf."III - CCM",cf."IV - CC",cf."V - TEAP",cf."VI - PG/E",cf."VII - MES",cf."VIII - DOU",cf."IX - CQA",
+  cf.entrevista_pontuacao,
+  cf.plano_aula_pontuacao,
+  cf.pontos,
+  cf.situacao,
+  cf.classificacao
+FROM classificacao_final cf
+ORDER BY cf.cargo,cf.regiao,cf.situacao,cf.classificacao;
+    `;
+    const rows = await sequelize.query(sql, {
+      type: sequelize.QueryTypes.SELECT,
+      replacements: { cargoFilter: `%${cargo}%`, regiaoFilter: `%${regiao}%` }
+    });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

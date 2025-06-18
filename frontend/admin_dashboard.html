@@ -66,7 +66,7 @@
       font-size: 14px; font-weight: bold; color: #000;
     }
     /* Estilos para Resultados */
-    .table-resultados { font-size: 14px; }
+    .table-resultados { font-size: 12px; }
     .table-resultados thead th {
       background-color: #343a40; color: white; position: sticky; top: 0;
     }
@@ -74,10 +74,23 @@
     .table-resultados .classificado { background-color: #e6f7e6; }
     .table-resultados .nao-classificado { background-color: #ffe6e6; }
     .table-resultados .reserva-pcd { background-color: #e6f7e6; }
+    .table-resultados .pcd-row { background-color: #e3f2fd; }
+    .table-resultados .eliminado-row { background-color: #ffcccc; }
     .resultado-cargo { margin-bottom: 30px; border: 1px solid #dee2e6; border-radius: 5px; overflow: hidden; }
     .resultado-header {
       background-color: #f8f9fa; padding: 10px 15px;
       border-bottom: 1px solid #dee2e6;
+    }
+    .separador-eliminados {
+      background-color: #ffebee;
+      font-weight: bold;
+      color: #c62828;
+      text-align: center;
+    }
+    .legenda {
+      font-size: 10px;
+      margin-top: 5px;
+      color: #666;
     }
   </style>
 </head>
@@ -121,14 +134,11 @@
           <i class="bi bi-list-check me-2"></i>Inscrições
         </a>
       </li>
-
-       <!-- Validação (reintroduzido) -->
-       <li class="nav-item">
+      <li class="nav-item">
         <a class="nav-link" href="admin_validacao.html">
           <i class="bi bi-check2-square me-2"></i>Validação
         </a>
       </li>
-
       <li class="nav-item">
         <a class="nav-link" href="#" data-section="resultados">
           <i class="bi bi-trophy me-2"></i>Resultados
@@ -249,6 +259,11 @@
                 <p class="mt-2">Carregando resultados...</p>
               </div>
             </div>
+            <div class="legenda">
+              <strong>Legenda:</strong> RCM=Requisitos Mínimos para Cargo, CCF=Cert. Conclusão Fundamental, 
+              CCM=Cert. Conclusão Ensino Médio, CC=Cursos Complementares, TEAP=Tempo de Exercício, 
+              PG/E=Pós Graduação/Especialização, MES=Mestrado, DOU=Doutorado, CQA=Qualificação/Aperfeiçoamento
+            </div>
           </div>
         </div>
       </div>
@@ -354,7 +369,7 @@
       $('#btnGeneratePDF').click(() => {
         const cargo = $('#filterCargo').val() || '';
         const regiao = $('#filterRegiao').val() || '';
-        let url = '/api/admin/resultados-pss/pdf';
+        let url = '/api/admin/resultados-pss/pdf-detalhado';
         const p = [];
         if (cargo) p.push(`cargo=${encodeURIComponent(cargo)}`);
         if (regiao) p.push(`regiao=${encodeURIComponent(regiao)}`);
@@ -515,73 +530,129 @@
     }
 
     async function loadResultados() {
-      $('#resultadosContainer').html(`
-        <div class="text-center my-5">
-          <div class="spinner-border text-primary" role="status"></div>
-          <p class="mt-2">Carregando resultados...</p>
-        </div>
-      `);
-      const params = new URLSearchParams({
-        cargo: $('#filterCargo').val(),
-        regiao: $('#filterRegiao').val()
-      });
-      try {
-        const res = await fetch(`/api/admin/resultados-pss?${params}`);
-        const data = await res.json();
-        if (!data.length) {
-          $('#resultadosContainer').html('<p class="text-center">Nenhum resultado encontrado.</p>');
-          return;
-        }
-        let out = '';
-        data.forEach(g => {
-          const total = g.candidatos.length;
-          const ratio = g.vagas_imediatas ? (total / g.vagas_imediatas).toFixed(2) : 'N/A';
-          out += `
-            <div class="resultado-cargo">
-              <div class="resultado-header d-flex justify-content-between align-items-center mb-2">
-                <div>
-                  <span class="badge bg-primary">${g.cargo}</span>
-                  <span class="badge bg-secondary ms-1">${g.regiao}</span>
-                  <span class="badge bg-info ms-1">Relação: ${total}/${g.vagas_imediatas} (${ratio})</span>
-                </div>
-                <small class="text-muted">
-                  Vagas: ${g.vagas_imediatas} imediatas |
-                  ${g.reserva_pcd} reserva PcD |
-                  Total: ${total}
-                </small>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-bordered table-hover table-resultados">
-                  <thead>
-                    <tr>
-                      <th>Cl.</th><th>Nome</th><th>Idade</th>
-                      <th>CPF</th><th>Pontuação</th><th>Situação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${g.candidatos.map(c =>
-                      `<tr class="${getRowClass(c)}">
-                        <td>${c.classificacao}º</td>
-                        <td>${c.candidato_nome}${c.pcd?'<span class="badge bg-info ms-2">PcD</span>':''}</td>
-                        <td>${c.idade??'N/A'}</td>
-                        <td>${formatCPF(c.candidato_cpf)}</td>
-                        <td>${c.pontuacao??0}</td>
-                        <td>${c.situacao}</td>
-                      </tr>`
-                    ).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>`;
-        });
-        $('#resultadosContainer').html(out);
-      } catch (e) {
-        console.error(e);
-        $('#resultadosContainer').html(`
-          <div class="alert alert-danger">Erro: ${e.message}</div>
-        `);
-      }
+  $('#resultadosContainer').html(`
+    <div class="text-center my-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-2">Carregando resultados...</p>
+    </div>
+  `);
+  const params = new URLSearchParams({
+    cargo: $('#filterCargo').val(),
+    regiao: $('#filterRegiao').val()
+  });
+  try {
+    // Usa o novo endpoint detalhado!
+    const res = await fetch(`/api/admin/resultados-pss/detalhado?${params}`);
+    const data = await res.json();
+    if (!data.length) {
+      $('#resultadosContainer').html('<p class="text-center">Nenhum resultado encontrado.</p>');
+      return;
     }
+    
+    // Agrupa por cabecalho (cargo - regiao)
+    const grupos = {};
+    data.forEach(row => {
+      if (!grupos[row.cabecalho]) grupos[row.cabecalho] = [];
+      grupos[row.cabecalho].push(row);
+    });
+
+    let out = '';
+    Object.entries(grupos).forEach(([cabecalho, candidatos]) => {
+      const classificados = candidatos.filter(c => c.situacao === 'Classificado');
+      const eliminados = candidatos.filter(c => c.situacao === 'Eliminado');
+      out += `
+      <div class="resultado-cargo">
+        <div class="resultado-header d-flex justify-content-between align-items-center mb-2">
+          <div><span class="badge bg-primary">${cabecalho}</span></div>
+          <small class="text-muted">Total: ${candidatos.length}</small>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover table-resultados">
+            <thead>
+              <tr>
+                <th>Inscrição</th>
+                <th>Nome</th>
+                <th>Modalidade</th>
+                <th>D.N.</th>
+                <th>I - RCM</th>
+                <th>II - CCF</th>
+                <th>III - CCM</th>
+                <th>IV - CC</th>
+                <th>V - TEAP</th>
+                <th>VI - PG/E</th>
+                <th>VII - MES</th>
+                <th>VIII - DOU</th>
+                <th>IX - CQA</th>
+                <th>Entrevista</th>
+                <th>Plano Aula</th>
+                <th>Pontos</th>
+                <th>Situação</th>
+                <th>Classif.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${classificados.map(c => `
+                <tr>
+                  <td>${c.inscricao_id}</td>
+                  <td>${c.nome}</td>
+                  <td>${c.modalidade}</td>
+                  <td>${c.dn}</td>
+                  <td>${c['I - RCM']}</td>
+                  <td>${c['II - CCF']}</td>
+                  <td>${c['III - CCM']}</td>
+                  <td>${c['IV - CC']}</td>
+                  <td>${c['V - TEAP']}</td>
+                  <td>${c['VI - PG/E']}</td>
+                  <td>${c['VII - MES']}</td>
+                  <td>${c['VIII - DOU']}</td>
+                  <td>${c['IX - CQA']}</td>
+                  <td>${c.entrevista_pontuacao || 0}</td>
+                  <td>${c.plano_aula_pontuacao || 0}</td>
+                  <td>${c.pontos}</td>
+                  <td>${c.situacao}</td>
+                  <td>${c.classificacao}</td>
+                </tr>
+              `).join('')}
+              ${eliminados.length > 0 ? `
+                <tr class="separador-eliminados">
+                  <td colspan="18">--- ELIMINADOS ---</td>
+                </tr>
+                ${eliminados.map(c => `
+                  <tr class="eliminado-row">
+                    <td>${c.inscricao_id}</td>
+                    <td>${c.nome}</td>
+                    <td>${c.modalidade}</td>
+                    <td>${c.dn}</td>
+                    <td>${c['I - RCM']}</td>
+                    <td>${c['II - CCF']}</td>
+                    <td>${c['III - CCM']}</td>
+                    <td>${c['IV - CC']}</td>
+                    <td>${c['V - TEAP']}</td>
+                    <td>${c['VI - PG/E']}</td>
+                    <td>${c['VII - MES']}</td>
+                    <td>${c['VIII - DOU']}</td>
+                    <td>${c['IX - CQA']}</td>
+                    <td>${c.entrevista_pontuacao || 0}</td>
+                    <td>${c.plano_aula_pontuacao || 0}</td>
+                    <td>${c.pontos}</td>
+                    <td>${c.situacao}</td>
+                    <td>${c.classificacao}</td>
+                  </tr>
+                `).join('')}
+              ` : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      `;
+    });
+    $('#resultadosContainer').html(out);
+
+  } catch (e) {
+    console.error(e);
+    $('#resultadosContainer').html(`<div class="alert alert-danger">Erro: ${e.message}</div>`);
+  }
+}
 
     function getRowClass(c) {
       if (c.situacao === 'Classificado') return 'classificado';
