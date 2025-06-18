@@ -547,7 +547,7 @@ ORDER BY cf.cargo,cf.regiao,cf.situacao,cf.classificacao;
     }, {});
 
     const printedAt = new Date().toLocaleString('pt-BR', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',timeZone: 'America/Sao_Paulo' // <<< Isso força horário de Brasília!
     });
 
     // Gera o conteúdo do PDF
