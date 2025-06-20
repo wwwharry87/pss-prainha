@@ -261,6 +261,36 @@ router.post('/salvar-entrevista/:id', async (req, res) => {
   }
 });
 
+// Retificação da Entrevista (endpoint novo)
+router.post('/retificar-entrevista/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { justificativa } = req.body;
+    if (!justificativa?.trim()) {
+      return res.status(400).json({ success: false, message: 'Justificativa obrigatória' });
+    }
+    const valRec = await ValidacaoInscricao.findOne({ where: { inscricao_id: id } });
+    if (!valRec) {
+      return res.status(404).json({ success: false, message: 'Registro não encontrado' });
+    }
+    await valRec.update({
+      justificativa_retificacao_entrevista: justificativa.trim(),
+      data_retificacao_entrevista: new Date(),
+      entrevista_realizada: 0,
+      entrevista_pontuacao: null,
+      plano_aula_pontuacao: null,
+      entrevista_obs: null,
+      entrevista_json: null,
+      entrevista_data: null,
+    });
+    res.json({ success: true, message: 'Retificação da entrevista registrada com sucesso' });
+  } catch (error) {
+    console.error('Erro na retificação da entrevista:', error);
+    res.status(500).json({ success: false, message: 'Erro ao processar retificação', error: error.message });
+  }
+});
+
+
 // 6) Filtros para frontend
 router.get('/resultados-pss/filtros', async (req, res) => {
   try {

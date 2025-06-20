@@ -52,6 +52,15 @@ const ValidacaoInscricao = sequelize.define('ValidacaoInscricao', {
     type: DataTypes.FLOAT,
     defaultValue: 0,
   },
+  justificativa_retificacao_entrevista: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  data_retificacao_entrevista: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  
    
 }, 
 {

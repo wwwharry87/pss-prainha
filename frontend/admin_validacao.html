@@ -10,38 +10,45 @@
     :root {
       --primary-color: #3498db;
       --secondary-color: #2c3e50;
-      --success-color: #2ecc71;
+      --success-color: #22bb5b;
       --danger-color: #e74c3c;
       --light-bg: #f8f9fa;
-      --card-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      --card-shadow: 0 4px 12px rgba(0,0,0,0.09);
     }
     body { background-color: var(--light-bg); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .navbar-custom { background-color: #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    .card-validacao { border-radius: 12px; box-shadow: var(--card-shadow); margin-bottom: 25px; border: none; transition: transform 0.3s ease; }
-    .card-validacao:hover { transform: translateY(-5px); }
+    .card-validacao { border-radius: 14px; box-shadow: var(--card-shadow); margin-bottom: 28px; border: none; transition: transform 0.3s; }
+    .card-validacao:hover { transform: translateY(-3px);}
     .icon-btn { cursor: pointer; color: var(--primary-color); margin-left: 8px; transition: color 0.2s; }
     .icon-btn:hover { color: var(--secondary-color); }
     .select-validacao { width: 150px; border-radius: 8px; }
-    .score-badge { background-color: var(--secondary-color); color: white; padding: 5px 12px; border-radius: 20px; font-weight: bold; }
-    .search-box { background-color: white; border-radius: 10px; padding: 20px; box-shadow: var(--card-shadow); margin-bottom: 25px; }
-    .btn-custom { border-radius: 8px; padding: 8px 20px; font-weight: 500; transition: all 0.3s; }
+    .score-badge { background-color: var(--secondary-color); color: white; padding: 5px 16px; border-radius: 20px; font-weight: bold; }
+    .search-box { background-color: white; border-radius: 10px; padding: 20px; box-shadow: var(--card-shadow); margin-bottom: 28px; }
+    .btn-custom { border-radius: 8px; padding: 10px 20px; font-weight: 500; border:none; }
     .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); }
     .btn-primary:hover { background-color: #2980b9; border-color: #2980b9; }
     .btn-success { background-color: var(--success-color); border-color: var(--success-color); }
-    .btn-info { background-color: #17a2b8; border-color: #17a2b8; color: white; }
-    .btn-info:hover { background-color: #138496; border-color: #117a8b; }
-    .modal-content { border-radius: 12px; }
-    .document-item { border-left: 4px solid var(--primary-color); transition: background-color 0.2s; }
-    .document-item:hover { background-color: #f1f8fe; }
-    .validation-icon { margin-left: 8px; }
+    .btn-info { background-color: #00c2f7; border-color: #00c2f7; color: white; }
+    .btn-info:hover { background-color: #0191b4; border-color: #0191b4; }
+    .btn-warning { color: #fff; background:#ffc107; border:none; }
+    .btn-warning:hover { background:#e0ad05; }
+    .btn-secondary { background:#949da6; border:none; color:#fff;}
+    .btn-secondary[disabled] { opacity: 0.7; }
     .retificacao-btn { margin-top: 10px; }
-    .toast { position: fixed; bottom: 20px; right: 20px; z-index: 1100; }
+    .modal-content { border-radius: 13px;}
+    .list-group-item.document-item { border-left: 4px solid var(--primary-color); transition: background-color 0.2s; background: transparent;}
+    .list-group-item.document-item:hover { background-color: #f1f8fe; }
+    .validation-icon { margin-left: 8px; }
     .status-validado { color: var(--success-color); font-weight: bold; }
     .status-pendente { color: var(--danger-color); font-weight: bold; }
+    .badge.bg-success { font-size: 1em; background: #158c57!important; }
+    .toast-container { position: fixed; bottom: 25px; right: 25px; z-index: 9999;}
+    .form-label { font-weight:600; }
+    .fw-bold { font-weight: 700 !important; }
   </style>
 </head>
 <body>
-  <!-- Cabeçalho com Botão Voltar e Sair -->
+  <!-- Cabeçalho -->
   <nav class="navbar navbar-expand navbar-custom mb-4 py-3">
     <div class="container-fluid">
       <a class="navbar-brand fw-bold" href="admin_dashboard.html">
@@ -52,9 +59,8 @@
       </button>
     </div>
   </nav>
-  
   <div class="container my-4">
-    <!-- Campo de Busca de CPF com máscara -->
+    <!-- Busca CPF -->
     <div class="search-box">
       <div class="row g-3 align-items-center">
         <div class="col-md-8">
@@ -70,15 +76,12 @@
         </div>
       </div>
     </div>
-    
-    <!-- Seção de dados do candidato -->
+    <!-- Dados do candidato -->
     <div id="candidateSection" class="mb-4"></div>
-    
-    <!-- Lista de Inscrições para Validação -->
+    <!-- Inscrições -->
     <div id="inscriptionsSection" class="row g-4"></div>
   </div>
-  
-  <!-- Modal para Visualização de Anexos -->
+  <!-- Modal Visualização -->
   <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
@@ -95,8 +98,7 @@
       </div>
     </div>
   </div>
-  
-  <!-- Modal para Retificação -->
+  <!-- Modal Retificação -->
   <div class="modal fade" id="retificacaoModal" tabindex="-1" aria-labelledby="retificacaoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -118,8 +120,29 @@
       </div>
     </div>
   </div>
-
-  <!-- Modal para Entrevista -->
+  <!-- Modal Retificação Entrevista -->
+  <div class="modal fade" id="retificacaoEntrevistaModal" tabindex="-1" aria-labelledby="retificacaoEntrevistaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="retificacaoEntrevistaModalLabel">Solicitar Retificação da Entrevista</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="justificativaRetificacaoEntrevista" class="form-label fw-bold">Justificativa:</label>
+            <textarea class="form-control" id="justificativaRetificacaoEntrevista" rows="5" placeholder="Descreva detalhadamente o motivo da retificação da entrevista..." required></textarea>
+            <div class="invalid-feedback">Por favor, informe a justificativa para a retificação da entrevista.</div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-custom" id="confirmarRetificacaoEntrevista">Confirmar Retificação</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Entrevista -->
   <div class="modal fade" id="entrevistaModal" tabindex="-1" aria-labelledby="entrevistaModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -155,30 +178,56 @@
       </div>
     </div>
   </div>
-
+  <div class="toast-container" id="toast-container"></div>
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // ==== MÁSCARA CPF e eventos ====
     $(document).ready(function(){
       $('#cpfInput').mask('000.000.000-00');
     });
+    document.getElementById('btnBuscar').addEventListener('click', buscarCandidato);
+    document.getElementById('cpfInput').addEventListener('keypress', e => { if (e.key === 'Enter') buscarCandidato(); });
+    document.getElementById('logoutBtn').addEventListener('click', () => { sessionStorage.clear(); localStorage.clear(); window.location.replace('/index.html'); });
+    document.getElementById('confirmarRetificacao').addEventListener('click', confirmarRetificacao);
+    document.getElementById('confirmarRetificacaoEntrevista').addEventListener('click', confirmarRetificacaoEntrevista);
+    $('#btnSalvarEntrevista').on('click', salvarEntrevista);
 
+    // ==== UTILS ====
     function formatarCPF(cpf) {
       return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     }
+    function showToast(type, message) {
+      const id = `toast-${Date.now()}`;
+      const bg = type === 'danger' ? 'bg-danger' : type === 'warning' ? 'bg-warning text-dark' : 'bg-success';
+      const toast = $(`
+        <div class="toast align-items-center ${bg} border-0" id="${id}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3800">
+          <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+          </div>
+        </div>
+      `);
+      $('#toast-container').append(toast);
+      const bsToast = new bootstrap.Toast(document.getElementById(id));
+      bsToast.show();
+      toast.on('hidden.bs.toast', function () { toast.remove(); });
+    }
 
+    // ==== VISUALIZAÇÃO DE ARQUIVO ====
     function visualizarArquivo(filename) {
       document.getElementById('previewFrame').src = `/download/${filename}?preview=true`;
       const modal = new bootstrap.Modal(document.getElementById('previewModal'));
       modal.show();
     }
 
+    // ==== BUSCA CANDIDATO (API) ====
     async function buscarCandidato() {
       const cpfDigitado = $('#cpfInput').val().replace(/\D/g, '');
       if(cpfDigitado.length !== 11){
-        alert("Informe um CPF válido (11 dígitos).");
+        showToast('warning', "Informe um CPF válido (11 dígitos).");
         return;
       }
       $('#btnBuscar').html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Buscando...');
@@ -192,13 +241,13 @@
         exibirCandidato(data.candidato);
         exibirInscricoes(data.inscricoes || []);
       } catch (error) {
-        console.error("Erro na busca:", error);
-        alert(error.message || "Ocorreu um erro ao buscar o candidato. Por favor, tente novamente.");
+        showToast('danger', error.message || "Ocorreu um erro ao buscar o candidato. Por favor, tente novamente.");
       } finally {
         $('#btnBuscar').html('<i class="bi bi-search me-2"></i>Buscar Candidato');
       }
     }
 
+    // ==== EXIBE DADOS DO CANDIDATO ====
     function exibirCandidato(candidato) {
       const candidateSection = document.getElementById('candidateSection');
       candidateSection.innerHTML = `
@@ -224,6 +273,7 @@
       `;
     }
 
+    // ==== MONTAR LISTA DE DOCUMENTOS ====
     function montarListaDocumentos(inscricao, disabled) {
       const pontosDocumento = {
         "doc_escolaridade_path": 50,
@@ -233,7 +283,6 @@
         "doc_plano_aula_path": 0
       };
       const docs = [];
-
       // Campos fixos (inclui Plano de Aula sem pontuação)
       for (const campo in pontosDocumento) {
         if (inscricao[campo]) {
@@ -255,14 +304,12 @@
           docs.push({ label, filename: inscricao[campo], campo, iconeValidacao });
         }
       }
-
       // Tempo de Exercício
       if (inscricao.doc_tempo_exercicio_path) {
         let tempoVal = inscricao.tempo_exercicio || "";
         let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
         let pts = 0;
         let iconeValidacao = "";
-
         if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
           if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
             pts = tempoPoints[tempoVal] || 0;
@@ -271,13 +318,11 @@
             iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
           }
         }
-
         let tempoText = "";
         if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
         else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
         else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
         else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
-
         docs.push({
           label: `Tempo de Exercício${tempoText} (${pts} pts)`,
           filename: inscricao.doc_tempo_exercicio_path,
@@ -285,7 +330,6 @@
           iconeValidacao
         });
       }
-
       // Campos em array (cursos, qualificações, pós)
       const camposArray = ['doc_cursos', 'doc_qualificacao', 'doc_pos'];
       camposArray.forEach(campo => {
@@ -299,7 +343,6 @@
                                : "Pós-graduação";
               const chaveValidacao = `${campo}_${i}`;
               let iconeValidacao = "";
-
               if (inscricao.validacoes && inscricao.validacoes[chaveValidacao]) {
                 if (inscricao.validacoes[chaveValidacao] === "confirmado") {
                   iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
@@ -307,7 +350,6 @@
                   iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
                 }
               }
-
               docs.push({
                 label: `${labelTexto} ${i+1} (${pts} pts)`,
                 filename,
@@ -320,7 +362,6 @@
           }
         }
       });
-
       // Outros documentos (sem repetir Plano de Aula)
       const outrosCampos = [
         'doc_diploma_path', 'doc_especifico_path',
@@ -330,12 +371,9 @@
         if (inscricao[campo]) {
           let label = campo.replace('doc_', '').replace('_path', '').replace(/_/g, ' ');
           label = label.charAt(0).toUpperCase() + label.slice(1);
-          
-          // Adicionar pontos para mestrado/doutorado
           if (campo === 'doc_mestrado_path' || campo === 'doc_doutorado_path') {
             label += ` (5 pts)`;
           }
-          
           let iconeValidacao = "";
           if (inscricao.validacoes && inscricao.validacoes[campo]) {
             if (inscricao.validacoes[campo] === "confirmado") {
@@ -344,14 +382,15 @@
               iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
             }
           }
-          
           docs.push({ label, filename: inscricao[campo], campo, iconeValidacao });
         }
       });
-
       return docs;
     }
 
+    // ==== EXIBIR INSCRIÇÕES ====
+    let inscricaoRetificacaoEntrevistaId = null;
+    let inscricaoRetificacaoId = null;
     function exibirInscricoes(inscricoes) {
       const container = document.getElementById('inscriptionsSection');
       container.innerHTML = '';
@@ -368,7 +407,6 @@
       inscricoes.forEach((insc, index) => {
         const isDisabled = insc.status === 'VALIDADO';
         const entrevistaJaFeita = insc.entrevista_realizada === 1;
-
         const documentos = montarListaDocumentos(insc, isDisabled);
         let docsHTML = '<ul class="list-group list-group-flush">';
         documentos.forEach(doc => {
@@ -404,7 +442,6 @@
           }
         });
         docsHTML += '</ul>';
-
         const cargoNome = insc.Cargo ? `${insc.Cargo.nome} - ${insc.Cargo.nivel}` : 'Não Informado';
         const pontuacao = insc.pontuacao || 0;
         let justificativaHTML = '';
@@ -415,8 +452,16 @@
               <div class="mt-2">${insc.justificativa_retificacao}</div>
             </div>`;
         }
-
-        // Exibir detalhes da entrevista, se houver
+        let justificativaEntrevistaHTML = '';
+        if (insc.justificativa_retificacao_entrevista) {
+          justificativaEntrevistaHTML = `
+            <div class="alert alert-warning mt-3">
+              <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Justificativa da Retificação da Entrevista:</strong>
+              <div class="mt-2">${insc.justificativa_retificacao_entrevista}</div>
+              <div class="mt-1"><small>Data: ${insc.data_retificacao_entrevista ? (new Date(insc.data_retificacao_entrevista).toLocaleString('pt-BR')) : '--'}</small></div>
+            </div>
+          `;
+        }
         let entrevistaHTML = '';
         if (insc.entrevista_pontuacao !== null && insc.entrevista_pontuacao !== undefined && insc.entrevista_pontuacao !== '') {
           entrevistaHTML = `
@@ -430,12 +475,13 @@
             </div>
           `;
         }
-
-        // Botão ou selo de entrevista
+        // Botão ou selo de entrevista + retificação
         let entrevistaBtn = '';
         let entrevistaSelo = '';
+        let btnRetificacaoEntrevista = '';
         if (isDisabled && entrevistaJaFeita) {
           entrevistaSelo = `<span class="badge bg-success mt-2"><i class="bi bi-mic-fill me-1"></i> Entrevista Realizada</span>`;
+          btnRetificacaoEntrevista = `<button class="btn btn-warning btn-custom retificacao-btn mt-2" onclick="abrirModalRetificacaoEntrevista(${insc.id})"><i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação da Entrevista</button>`;
         } else if (isDisabled && !entrevistaJaFeita) {
           entrevistaBtn = `
             <button class="btn btn-info btn-custom mt-2" onclick="abrirModalEntrevista(
@@ -449,14 +495,13 @@
             </button>
           `;
         }
-
         const botoesHTML = isDisabled
           ? `<button class="btn btn-secondary btn-custom" disabled><i class="bi bi-check-circle-fill me-2"></i>Validação Confirmada</button>
              <button class="btn btn-warning btn-custom retificacao-btn" onclick="abrirModalRetificacao(${insc.id})"><i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar Retificação</button>
              ${entrevistaBtn}
-             ${entrevistaSelo}`
+             ${entrevistaSelo}
+             ${btnRetificacaoEntrevista}`
           : `<button class="btn btn-success btn-custom" onclick="submitValidacao(${insc.id})"><i class="bi bi-check-circle-fill me-2"></i>Confirmar Validação</button>`;
-
         const card = document.createElement('div');
         card.className = 'col-12';
         card.innerHTML = `
@@ -470,6 +515,7 @@
             </div>
             <div class="card-body">
               ${justificativaHTML}
+              ${justificativaEntrevistaHTML}
               ${entrevistaHTML}
               <div class="row mb-3">
                 <div class="col-md-6"><p><strong><i class="bi bi-briefcase me-2"></i>Cargo:</strong> ${cargoNome}</p></div>
@@ -490,11 +536,11 @@
       });
     }
 
+    // ==== VALIDAÇÃO DE DOCUMENTOS ====
     async function submitValidacao(inscricaoId) {
       const selects = document.querySelectorAll(`[id^="validacao_${inscricaoId}_"]`);
       const validacoes = {};
       let todosSelecionados = true;
-
       selects.forEach(select => {
         if (!select.value) {
           todosSelecionados = false;
@@ -524,18 +570,16 @@
           throw new Error(result.error || 'Erro ao registrar validação');
         }
       } catch (error) {
-        console.error("Erro ao enviar validação:", error);
         showToast('danger', error.message || 'Erro ao enviar validação. Tente novamente.');
       }
     }
 
-    let inscricaoRetificacaoId = null;
+    // ==== MODAL RETIFICAÇÃO DOCUMENTOS ====
     function abrirModalRetificacao(inscricaoId) {
       inscricaoRetificacaoId = inscricaoId;
       $('#justificativaRetificacao').val('').removeClass('is-invalid');
       new bootstrap.Modal(document.getElementById('retificacaoModal')).show();
     }
-
     async function confirmarRetificacao() {
       const justificativa = $('#justificativaRetificacao').val().trim();
       if (!justificativa) {
@@ -558,33 +602,47 @@
         bootstrap.Modal.getInstance(document.getElementById('retificacaoModal')).hide();
         buscarCandidato();
       } catch (error) {
-        console.error('Erro na retificação:', error);
         showToast('danger', error.message || 'Erro ao solicitar retificação');
       } finally {
         $('#confirmarRetificacao').prop('disabled', false).html('Confirmar Retificação');
       }
     }
 
-    function showToast(type, message) {
-      const toastContainer = document.createElement('div');
-      toastContainer.className = `toast-container position-fixed bottom-0 end-0 p-3`;
-      const toast = document.createElement('div');
-      toast.className = `toast align-items-center text-white bg-${type} border-0`;
-      toast.setAttribute('role', 'alert');
-      toast.setAttribute('aria-live', 'assertive');
-      toast.setAttribute('aria-atomic', 'true');
-      toast.innerHTML = `
-        <div class="d-flex">
-          <div class="toast-body">${message}</div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>`;
-      toastContainer.appendChild(toast);
-      document.body.appendChild(toastContainer);
-      const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 5000 });
-      bsToast.show();
-      toast.addEventListener('hidden.bs.toast', () => toastContainer.remove());
+    // ==== MODAL RETIFICAÇÃO ENTREVISTA ====
+    function abrirModalRetificacaoEntrevista(inscricaoId) {
+      inscricaoRetificacaoEntrevistaId = inscricaoId;
+      $('#justificativaRetificacaoEntrevista').val('').removeClass('is-invalid');
+      new bootstrap.Modal(document.getElementById('retificacaoEntrevistaModal')).show();
+    }
+    async function confirmarRetificacaoEntrevista() {
+      const justificativa = $('#justificativaRetificacaoEntrevista').val().trim();
+      if (!justificativa) {
+        $('#justificativaRetificacaoEntrevista').addClass('is-invalid');
+        showToast('warning', 'Por favor, informe a justificativa para a retificação da entrevista.');
+        return;
+      }
+      $('#confirmarRetificacaoEntrevista').prop('disabled', true).html(
+        '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processando...'
+      );
+      try {
+        const response = await fetch(`/api/admin/retificar-entrevista/${inscricaoRetificacaoEntrevistaId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ justificativa })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Erro ao solicitar retificação');
+        showToast('success', result.message || 'Retificação da entrevista registrada com sucesso!');
+        bootstrap.Modal.getInstance(document.getElementById('retificacaoEntrevistaModal')).hide();
+        buscarCandidato();
+      } catch (error) {
+        showToast('danger', error.message || 'Erro ao solicitar retificação da entrevista');
+      } finally {
+        $('#confirmarRetificacaoEntrevista').prop('disabled', false).html('Confirmar Retificação');
+      }
     }
 
+    // ==== MODAL ENTREVISTA ====
     function abrirModalEntrevista(id, pontuacao = '', planoAulaPontuacao = '', obs = '', detalhes = '') {
       $('#entrevistaInscId').val(id);
       $('#entrevistaPontuacao').val(pontuacao);
@@ -593,14 +651,12 @@
       $('#entrevistaJson').val(detalhes);
       new bootstrap.Modal(document.getElementById('entrevistaModal')).show();
     }
-
     async function salvarEntrevista() {
       const id = $('#entrevistaInscId').val();
       const pontuacao = $('#entrevistaPontuacao').val();
       const plano_aula_pontuacao = $('#planoAulaPontuacao').val();
       const obs = $('#entrevistaObs').val();
       let detalhes = $('#entrevistaJson').val();
-
       let entrevista_json = detalhes;
       try {
         if (detalhes.trim().startsWith('{') || detalhes.trim().startsWith('[')) {
@@ -609,7 +665,6 @@
       } catch {
         // salva como texto mesmo
       }
-
       try {
         $('#btnSalvarEntrevista').prop('disabled', true).text('Salvando...');
         const resp = await fetch(`/api/admin/salvar-entrevista/${id}`, {
@@ -633,13 +688,6 @@
         $('#btnSalvarEntrevista').prop('disabled', false).text('Salvar Entrevista');
       }
     }
-    $('#btnSalvarEntrevista').on('click', salvarEntrevista);
-
-    // Listeners
-    document.getElementById('btnBuscar').addEventListener('click', buscarCandidato);
-    document.getElementById('cpfInput').addEventListener('keypress', e => { if (e.key === 'Enter') buscarCandidato(); });
-    document.getElementById('logoutBtn').addEventListener('click', () => { sessionStorage.clear(); localStorage.clear(); window.location.replace('/index.html'); });
-    document.getElementById('confirmarRetificacao').addEventListener('click', confirmarRetificacao);
   </script>
 </body>
 </html>
