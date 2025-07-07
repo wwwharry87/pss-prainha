@@ -158,6 +158,25 @@ router.get('/candidato/:cpf', async (req, res) => {
   }
 });
 
+router.post('/ajustar-tempo-exercicio/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { novoTempoExercicio, justificativa } = req.body;
+    if (!novoTempoExercicio) return res.status(400).json({ success: false, message: 'Tempo obrigatório.' });
+    if (!justificativa?.trim()) return res.status(400).json({ success: false, message: 'Justificativa obrigatória.' });
+    const insc = await Inscricao.findByPk(id);
+    if (!insc) return res.status(404).json({ success: false, message: 'Inscrição não encontrada.' });
+
+    // Você pode salvar a justificativa em um campo próprio, ou nos observações, como preferir:
+    await insc.update({ tempo_exercicio: novoTempoExercicio });
+    // Aqui pode salvar a justificativa em um campo apropriado (ex: insc.justificativa_tempo_exercicio)
+    res.json({ success: true, message: 'Tempo de exercício ajustado com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Erro ao ajustar tempo.', error: error.message });
+  }
+});
+
+
 // 4) Validar inscrição
 router.post('/verificar-inscricao/:id', async (req, res) => {
   try {

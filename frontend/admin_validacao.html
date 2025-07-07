@@ -179,6 +179,38 @@
     </div>
   </div>
   <div class="toast-container" id="toast-container"></div>
+
+  <div class="modal fade" id="ajusteTempoModal" tabindex="-1" aria-labelledby="ajusteTempoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="ajusteTempoModalLabel">Ajustar Tempo de Exercício</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="novoTempoExercicio" class="form-label fw-bold">Novo Tempo de Exercício:</label>
+            <select class="form-select" id="novoTempoExercicio">
+              <option value="">-- Selecionar --</option>
+              <option value="ate02">Até 2 anos</option>
+              <option value="de02a04">De 2 a 4 anos</option>
+              <option value="de04a06">De 4 a 6 anos</option>
+              <option value="mais06">Mais de 6 anos</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="justificativaTempoExercicio" class="form-label fw-bold">Justificativa do ajuste:</label>
+            <textarea class="form-control" id="justificativaTempoExercicio" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-custom" id="confirmarAjusteTempo">Confirmar Ajuste</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
@@ -306,30 +338,41 @@
       }
       // Tempo de Exercício
       if (inscricao.doc_tempo_exercicio_path) {
-        let tempoVal = inscricao.tempo_exercicio || "";
-        let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
-        let pts = 0;
-        let iconeValidacao = "";
-        if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
-          if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
-            pts = tempoPoints[tempoVal] || 0;
-            iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
-          } else {
-            iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
-          }
-        }
-        let tempoText = "";
-        if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
-        else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
-        else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
-        else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
-        docs.push({
-          label: `Tempo de Exercício${tempoText} (${pts} pts)`,
-          filename: inscricao.doc_tempo_exercicio_path,
-          campo: "doc_tempo_exercicio_path",
-          iconeValidacao
-        });
-      }
+  let tempoVal = inscricao.tempo_exercicio || "";
+  let tempoPoints = { 'ate02': 5, 'de02a04': 10, 'de04a06': 15, 'mais06': 20 };
+  let pts = 0;
+  let iconeValidacao = "";
+  if (inscricao.validacoes && inscricao.validacoes["doc_tempo_exercicio_path"]) {
+    if (inscricao.validacoes["doc_tempo_exercicio_path"] === "confirmado") {
+      pts = tempoPoints[tempoVal] || 0;
+      iconeValidacao = '<i class="bi bi-check-circle-fill text-success validation-icon" title="Documento confirmado"></i>';
+    } else {
+      iconeValidacao = '<i class="bi bi-x-circle-fill text-danger validation-icon" title="Documento rejeitado"></i>';
+    }
+  }
+  let tempoText = "";
+  if (tempoVal === "ate02") tempoText = " (Até 2 anos)";
+  else if (tempoVal === "de02a04") tempoText = " (De 2 a 4 anos)";
+  else if (tempoVal === "de04a06") tempoText = " (De 4 a 6 anos)";
+  else if (tempoVal === "mais06") tempoText = " (Mais de 6 anos)";
+
+  // Adiciona o ícone de ajuste SÓ nesse campo
+  let iconeAjuste = '';
+    if (!disabled) { // Só mostra o lápis se NÃO estiver validado
+      iconeAjuste = `
+        <i class="bi bi-pencil-square icon-btn ms-2" title="Ajustar Tempo de Exercício"
+          onclick="abrirModalTempoExercicio(${inscricao.id}, '${tempoVal}')"></i>
+      `;
+    }
+
+  docs.push({
+    label: `Tempo de Exercício${tempoText} (${pts} pts) ${iconeAjuste}`,
+    filename: inscricao.doc_tempo_exercicio_path,
+    campo: "doc_tempo_exercicio_path",
+    iconeValidacao
+  });
+}
+
       // Campos em array (cursos, qualificações, pós)
       const camposArray = ['doc_cursos', 'doc_qualificacao', 'doc_pos'];
       camposArray.forEach(campo => {
@@ -688,6 +731,51 @@
         $('#btnSalvarEntrevista').prop('disabled', false).text('Salvar Entrevista');
       }
     }
+
+    let inscricaoTempoExercicioId = null;
+
+function abrirModalTempoExercicio(inscricaoId, tempoAtual) {
+  inscricaoTempoExercicioId = inscricaoId;
+  $('#novoTempoExercicio').val(tempoAtual || '');
+  $('#justificativaTempoExercicio').val('');
+  new bootstrap.Modal(document.getElementById('ajusteTempoModal')).show();
+}
+
+$('#confirmarAjusteTempo').on('click', async function() {
+  const novoTempo = $('#novoTempoExercicio').val();
+  const justificativa = $('#justificativaTempoExercicio').val().trim();
+
+  if (!novoTempo) {
+    showToast('warning', 'Selecione o novo tempo de exercício.');
+    return;
+  }
+  if (!justificativa) {
+    showToast('warning', 'Informe a justificativa para o ajuste.');
+    return;
+  }
+
+  $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Processando...');
+  try {
+    const response = await fetch(`/api/admin/ajustar-tempo-exercicio/${inscricaoTempoExercicioId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ novoTempoExercicio: novoTempo, justificativa })
+    });
+    const result = await response.json();
+    if (response.ok) {
+      showToast('success', result.message || 'Ajuste salvo!');
+      buscarCandidato(); // Atualiza a tela
+      bootstrap.Modal.getInstance(document.getElementById('ajusteTempoModal')).hide();
+    } else {
+      throw new Error(result.error || 'Erro ao salvar ajuste');
+    }
+  } catch (error) {
+    showToast('danger', error.message || 'Erro ao enviar ajuste.');
+  } finally {
+    $(this).prop('disabled', false).html('Confirmar Ajuste');
+  }
+});
+
   </script>
 </body>
 </html>
